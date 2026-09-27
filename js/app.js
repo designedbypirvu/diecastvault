@@ -299,7 +299,7 @@
           <span class="card__series">${esc(item.series || 'No series')}</span>
           <span class="card__pills">
             <span class="pill pill--brand">${esc(item.diecastBrand)}</span>
-            <span class="pill pill--scale">${esc(item.scale)}</span>
+            <span class="pill pill--scale${item.scale === C.SCALES[0] ? ' is-default' : ''}">${esc(item.scale)}</span>
             ${item.shelved ? '<span class="pill pill--shelf" title="On the display shelf"><i data-lucide="library"></i>On shelf</span>' : ''}
             ${conditionPill(item.condition)}
           </span>

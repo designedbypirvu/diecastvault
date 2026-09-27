@@ -867,17 +867,21 @@ select option, select optgroup { background: var(--surface); color: var(--text);
 .grid[data-view='list'] .card__body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: 'title actions' 'meta meta';
+  grid-template-areas: 'title title' 'meta actions';
   align-content: center;
   gap: 12px 14px;
   padding: 18px 24px;
 }
-.grid[data-view='list'] .card__title { grid-area: title; align-self: center; font-size: 21px; }
-.grid[data-view='list'] .card__inline-actions { grid-area: actions; display: flex; gap: 8px; align-self: start; }
-.grid[data-view='list'] .card__meta { grid-area: meta; margin-top: 0; justify-content: flex-start; flex-wrap: wrap; min-width: 0; }
+/* The name gets the full width; actions share the row with the tags */
+.grid[data-view='list'] .card__title { grid-area: title; font-size: 21px; }
+.grid[data-view='list'] .card__inline-actions { grid-area: actions; display: flex; gap: 8px; align-self: end; }
+.grid[data-view='list'] .card__meta { grid-area: meta; align-self: center; margin-top: 0; justify-content: flex-start; flex-wrap: wrap; min-width: 0; }
 .grid[data-view='list'] .card__pills { flex-wrap: wrap; flex-shrink: 1; min-width: 0; }
 .grid[data-view='list'] .pill--scale { display: inline-flex; }
 .grid[data-view='list'] .pill--brand { display: inline-block; }
+/* Most of the collection is loose 1:64 — only tag the exceptions */
+.grid[data-view='list'] .pill--scale.is-default,
+.grid[data-view='list'] .pill--loose { display: none; }
 .grid[data-view='list'] .card__media .badge,
 .grid[data-view='list'] .card__media .scale-tag,
 .grid[data-view='list'] .card__media .card__actions { display: none; }
@@ -1310,13 +1314,15 @@ dialog.modal.is-closing::backdrop { animation: fadeOut 0.2s var(--ease) both; }
 
   .grid[data-view='list'] .card__media { flex-basis: 128px; aspect-ratio: 1; }
   .grid[data-view='list'] .card__body { padding: 12px 12px 12px 14px; gap: 8px 8px; }
-  .grid[data-view='list'] .card__title { font-size: 16px; }
+  .grid[data-view='list'] .card__title { font-size: 16px; -webkit-line-clamp: 3; }
   .grid[data-view='list'] .card__series { display: none; }
-  .grid[data-view='list'] .card__inline-actions { gap: 6px; }
+  /* Phones: stack the actions in a slim column so the name and tags share the remaining width */
+  .grid[data-view='list'] .card__body { grid-template-areas: 'title actions' 'meta actions'; column-gap: 10px; }
+  .grid[data-view='list'] .card__inline-actions { flex-direction: column; gap: 6px; align-self: center; }
   .grid[data-view='list'] .card__btn { width: 34px; height: 34px; border-radius: 10px; }
   .grid[data-view='list'] .card__pills { gap: 5px; }
   .grid[data-view='list'] .pill { height: 22px; padding: 0 8px; font-size: 11px; }
-  .grid[data-view='list'] .pill--brand { line-height: 22px; font-size: 9.5px; }
+  .grid[data-view='list'] .pill--brand { line-height: 22px; font-size: 9.5px; letter-spacing: 0.08em; }
 
   /* Modals become bottom sheets */
   dialog.modal { padding: 0; }
