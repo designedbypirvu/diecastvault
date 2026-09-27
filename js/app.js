@@ -433,6 +433,9 @@
   }
 
   $$('dialog.modal').forEach((dialog) => {
+    // iOS scrolls the (overflow: hidden) dialog to reveal the focused control while the sheet is still
+    // sliding in from below, leaving the sheet shifted up once the animation ends. Keep it pinned.
+    dialog.addEventListener('scroll', () => { dialog.scrollTop = 0; dialog.scrollLeft = 0; });
     dialog.addEventListener('cancel', (e) => { e.preventDefault(); closeModal(dialog); });
     // Close when clicking the backdrop (the dialog element itself, outside the card)
     dialog.addEventListener('mousedown', (e) => { dialog._downOnBackdrop = e.target === dialog; });
