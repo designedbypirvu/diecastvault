@@ -24,6 +24,8 @@ DV.config = Object.freeze({
 
   SCALES: ['1:64', '1:43', '1:36', '1:24', '1:18'],
 
+  SERIES: ['Mainline', 'Silver Series', 'Premium', 'Limited Edition', 'RLC'],
+
   CONDITIONS: [
     { value: 'Mint in Box / Carded', short: 'Carded', tone: 'mint', icon: 'package-check' },
     { value: 'Loose', short: 'Loose', tone: 'loose', icon: 'package-open' },

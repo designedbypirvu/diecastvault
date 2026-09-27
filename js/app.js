@@ -505,6 +505,7 @@
     scale: $('#fScale'),
     scaleCustom: $('#fScaleCustom'),
     series: $('#fSeries'),
+    seriesCustom: $('#fSeriesCustom'),
     conditions: $('#fCondition'),
     preview: $('#photoPreview'),
     file: $('#fFile'),
@@ -570,6 +571,11 @@
     form.diecast.innerHTML = brandOptions(C.DIECAST_BRANDS, state.items.map((i) => i.diecastBrand), 'Select manufacturer');
     form.car.innerHTML = brandOptions(C.CAR_BRANDS, state.items.map((i) => i.carBrand), 'Select car brand');
     form.scale.innerHTML = C.SCALES.map((s) => `<option value="${s}">${s}</option>`).join('') + `<option value="${C.CUSTOM}">Other</option>`;
+    const seriesUsed = [...new Set(state.items.map((i) => i.series))].filter((s) => s && !C.SERIES.includes(s)).sort(byText);
+    form.series.innerHTML = `<option value="">None</option>
+      ${C.SERIES.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}
+      ${seriesUsed.length ? `<optgroup label="From your collection">${seriesUsed.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}</optgroup>` : ''}
+      <option value="${C.CUSTOM}">Custom…</option>`;
     form.conditions.innerHTML = C.CONDITIONS.map((c) => `
       <label class="pill-option pill-option--${c.tone}">
         <input type="radio" name="condition" value="${esc(c.value)}" ${c.value === 'Loose' ? 'checked' : ''}>
@@ -580,7 +586,7 @@
     setChoice(form.car, form.carCustom, item?.carBrand ?? '');
     setChoice(form.scale, form.scaleCustom, item?.scale ?? '1:64');
     form.model.value = item?.model ?? '';
-    form.series.value = item?.series ?? '';
+    setChoice(form.series, form.seriesCustom, item?.series ?? '');
     if (item) {
       const radio = $$('input[name="condition"]', form.conditions).find((r) => r.value === item.condition);
       if (radio) radio.checked = true;
@@ -611,7 +617,7 @@
       carBrand: readChoice(form.car, form.carCustom),
       model: form.model.value.trim(),
       scale: readChoice(form.scale, form.scaleCustom),
-      series: form.series.value.trim(),
+      series: readChoice(form.series, form.seriesCustom),
       condition: $('input[name="condition"]:checked', form.conditions)?.value ?? 'Loose',
       shelved: $('input[name="shelved"]:checked', els.form)?.value === 'yes',
       image: form.photo,
@@ -682,7 +688,7 @@
       ['Car brand', item.carBrand, 'car-front'],
       ['Model', item.model, 'tag'],
       ['Scale', item.scale, 'ruler'],
-      ['Series / year', item.series || '—', 'layers'],
+      ['Series', item.series || '—', 'layers'],
       ['Condition', cond.value, cond.icon],
       ['Added', fmtDate(item.createdAt), 'calendar-days'],
     ];
@@ -974,6 +980,7 @@
     form.diecast.addEventListener('change', () => toggleCustom(form.diecast, form.diecastCustom));
     form.car.addEventListener('change', () => { toggleCustom(form.car, form.carCustom); if (!form.photo) setPhoto(''); });
     form.scale.addEventListener('change', () => toggleCustom(form.scale, form.scaleCustom));
+    form.series.addEventListener('change', () => toggleCustom(form.series, form.seriesCustom));
     els.form.addEventListener('input', (e) => {
       const field = e.target.closest('.field.has-error');
       if (field) { field.classList.remove('has-error'); $('.field__error', field).textContent = ''; }
