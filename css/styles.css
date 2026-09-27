@@ -1233,7 +1233,9 @@ dialog.modal.is-closing::backdrop { animation: fadeOut 0.2s var(--ease) both; }
   .view-toggle { justify-self: stretch; }
   .view-toggle button { flex: 1; }
   .select__label { display: none; }
-  .select select { padding-left: 0; }
+  .select { padding-left: 12px; }
+  .select::after { right: 12px; }
+  .select select { padding: 0 24px 0 0; }
 
   .chips {
     flex-wrap: nowrap;
@@ -1250,7 +1252,10 @@ dialog.modal.is-closing::backdrop { animation: fadeOut 0.2s var(--ease) both; }
   .grid[data-view='list'] .card__body { padding: 12px 14px; gap: 8px; }
   .grid[data-view='list'] .card__title { font-size: 16px; }
   .grid[data-view='list'] .card__series { display: none; }
-  .grid[data-view='list'] .badge { top: 8px; left: 8px; max-width: calc(100% - 16px); font-size: 9px; height: 22px; line-height: 22px; padding: 0 7px; }
+  .grid[data-view='list'] .badge,
+  .grid[data-view='list'] .scale-tag { top: 8px; left: 8px; right: auto; max-width: calc(100% - 16px); font-size: 9px; height: 22px; line-height: 22px; padding: 0 7px; }
+  /* Thumbnail is too narrow for both tags on one row: stack the scale under the brand */
+  .grid[data-view='list'] .scale-tag { top: 36px; }
   .grid[data-view='list'] .card__actions { right: 8px; bottom: 8px; gap: 6px; }
   .grid[data-view='list'] .card__actions .icon-btn { width: 32px; height: 32px; border-radius: 10px; }
 
@@ -1304,6 +1309,8 @@ dialog.modal.is-closing::backdrop { animation: fadeOut 0.2s var(--ease) both; }
 
 /* Touch devices: no hover, so keep card actions visible */
 @media (hover: none) {
+  /* iOS zooms the page when focusing a field under 16px, and the zoom sticks in home-screen apps */
+  .search input, .select select, .input, .field select { font-size: 16px; }
   .card__actions { opacity: 1; transform: none; }
   .card:hover { transform: none; }
   .card:hover .media.is-loaded img { transform: scale(1); }
