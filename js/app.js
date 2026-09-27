@@ -291,9 +291,15 @@
       </div>
       <div class="card__body">
         <h3 class="card__title"><span class="card__make">${esc(item.carBrand)}</span> ${esc(item.model)}</h3>
+        <div class="card__inline-actions">
+          <button type="button" class="icon-btn card__btn" data-action="edit" aria-label="Edit ${esc(item.model)}" title="Edit"><i data-lucide="pencil"></i></button>
+          <button type="button" class="icon-btn card__btn icon-btn--danger" data-action="delete" aria-label="Delete ${esc(item.model)}" title="Delete"><i data-lucide="trash-2"></i></button>
+        </div>
         <div class="card__meta">
           <span class="card__series">${esc(item.series || 'No series')}</span>
           <span class="card__pills">
+            <span class="pill pill--brand">${esc(item.diecastBrand)}</span>
+            <span class="pill pill--scale">${esc(item.scale)}</span>
             ${item.shelved ? '<span class="pill pill--shelf" title="On the display shelf"><i data-lucide="library"></i>On shelf</span>' : ''}
             ${conditionPill(item.condition)}
           </span>

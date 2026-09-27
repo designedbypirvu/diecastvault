@@ -852,15 +852,35 @@ select option, select optgroup { background: var(--surface); color: var(--text);
 .pill--custom { background: var(--crimson-soft); color: #FF6B61; }
 .pill--shelf { background: var(--gold-soft); color: var(--gold); }
 .card__pills { display: flex; flex-shrink: 0; gap: 6px; }
+.pill--brand { max-width: 100%; background: rgba(255, 255, 255, 0.06); color: var(--text); font: 600 10px/1 var(--font-display); letter-spacing: 0.12em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; line-height: 24px; }
+.pill--scale { background: transparent; border: 1px solid rgba(0, 229, 255, 0.4); color: var(--accent); letter-spacing: 0.04em; }
+/* Grid view shows brand, scale and actions over the photo; list view moves them next to the text */
+.card__inline-actions, .pill--brand, .pill--scale { display: none; }
+.card__btn { width: 36px; height: 36px; border-radius: 11px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); }
+.card__btn .icon { width: 16px; height: 16px; }
 
 /* List view */
 .grid[data-view='list'] { grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .grid[data-view='list'] .card { flex-direction: row; }
 .grid[data-view='list'] .card:hover { transform: translateX(4px); }
 .grid[data-view='list'] .card__media { flex: 0 0 240px; aspect-ratio: 16 / 10; }
-.grid[data-view='list'] .card__body { justify-content: center; padding: 18px 24px; }
-.grid[data-view='list'] .card__title { font-size: 21px; }
-.grid[data-view='list'] .card__meta { margin-top: 0; justify-content: flex-start; }
+.grid[data-view='list'] .card__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'title actions' 'meta meta';
+  align-content: center;
+  gap: 12px 14px;
+  padding: 18px 24px;
+}
+.grid[data-view='list'] .card__title { grid-area: title; align-self: center; font-size: 21px; }
+.grid[data-view='list'] .card__inline-actions { grid-area: actions; display: flex; gap: 8px; align-self: start; }
+.grid[data-view='list'] .card__meta { grid-area: meta; margin-top: 0; justify-content: flex-start; flex-wrap: wrap; min-width: 0; }
+.grid[data-view='list'] .card__pills { flex-wrap: wrap; flex-shrink: 1; min-width: 0; }
+.grid[data-view='list'] .pill--scale { display: inline-flex; }
+.grid[data-view='list'] .pill--brand { display: inline-block; }
+.grid[data-view='list'] .card__media .badge,
+.grid[data-view='list'] .card__media .scale-tag,
+.grid[data-view='list'] .card__media .card__actions { display: none; }
 
 /* Empty state */
 .empty { padding: 56px 16px 96px; text-align: center; }
@@ -1289,15 +1309,14 @@ dialog.modal.is-closing::backdrop { animation: fadeOut 0.2s var(--ease) both; }
   .chips::-webkit-scrollbar { display: none; }
 
   .grid[data-view='list'] .card__media { flex-basis: 128px; aspect-ratio: 1; }
-  .grid[data-view='list'] .card__body { padding: 12px 14px; gap: 8px; }
+  .grid[data-view='list'] .card__body { padding: 12px 12px 12px 14px; gap: 8px 8px; }
   .grid[data-view='list'] .card__title { font-size: 16px; }
   .grid[data-view='list'] .card__series { display: none; }
-  .grid[data-view='list'] .badge,
-  .grid[data-view='list'] .scale-tag { top: 8px; left: 8px; right: auto; max-width: calc(100% - 16px); font-size: 9px; height: 22px; line-height: 22px; padding: 0 7px; }
-  /* Thumbnail is too narrow for both tags on one row: stack the scale under the brand */
-  .grid[data-view='list'] .scale-tag { top: 36px; }
-  .grid[data-view='list'] .card__actions { right: 8px; bottom: 8px; gap: 6px; }
-  .grid[data-view='list'] .card__actions .icon-btn { width: 32px; height: 32px; border-radius: 10px; }
+  .grid[data-view='list'] .card__inline-actions { gap: 6px; }
+  .grid[data-view='list'] .card__btn { width: 34px; height: 34px; border-radius: 10px; }
+  .grid[data-view='list'] .card__pills { gap: 5px; }
+  .grid[data-view='list'] .pill { height: 22px; padding: 0 8px; font-size: 11px; }
+  .grid[data-view='list'] .pill--brand { line-height: 22px; font-size: 9.5px; }
 
   /* Modals become bottom sheets */
   dialog.modal { padding: 0; }
