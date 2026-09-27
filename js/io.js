@@ -74,34 +74,82 @@ DV.io = (() => {
     });
   }
 
-  /** Downscales an image file and returns a compact base64 JPEG data URL. */
-  function imageToDataURL(file, maxEdge = DV.config.MAX_IMAGE_EDGE) {
+  /* ─── Image compression ─────────────────────────────────── */
+  /** Approximate decoded size of a base64 data URL, in bytes. */
+  const dataURLBytes = (url) => Math.round((url.length - url.indexOf(',') - 1) * 0.75);
+
+  function loadImage(src) {
     return new Promise((resolve, reject) => {
-      if (!file || !file.type.startsWith('image/')) {
-        reject(new Error('Please choose an image file.'));
-        return;
-      }
-      const url = URL.createObjectURL(file);
       const img = new Image();
-      img.onload = () => {
-        const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#161920';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL('image/jpeg', 0.84));
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        reject(new Error('That image couldn’t be read.'));
-      };
-      img.src = url;
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('That image couldn’t be read.'));
+      img.src = src;
     });
   }
 
-  return { exportJSON, exportCSV, parseImport, readText, imageToDataURL };
+  // WebP is ~30% smaller than JPEG at the same quality; Safari can't encode it and returns PNG instead.
+  let webp = null;
+  function encode(canvas, quality) {
+    if (webp !== false) {
+      const out = canvas.toDataURL('image/webp', quality);
+      webp = out.startsWith('data:image/webp');
+      if (webp) return out;
+    }
+    return canvas.toDataURL('image/jpeg', quality);
+  }
+
+  /**
+   * Downscales and re-encodes an image until it fits the byte budget:
+   * steps quality down first, then resolution, never below MIN_IMAGE_EDGE.
+   */
+  async function compressImage(src, { maxEdge = DV.config.MAX_IMAGE_EDGE, maxBytes = DV.config.MAX_IMAGE_BYTES } = {}) {
+    const img = await loadImage(src);
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    if (!w || !h) throw new Error('That image couldn’t be read.');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    let edge = Math.min(maxEdge, Math.max(w, h));
+    let best = '';
+    for (;;) {
+      const scale = edge / Math.max(w, h);
+      canvas.width = Math.max(1, Math.round(w * scale));
+      canvas.height = Math.max(1, Math.round(h * scale));
+      ctx.fillStyle = '#161920'; // background for transparent PNGs
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      for (const q of [0.82, 0.72, 0.62]) {
+        const out = encode(canvas, q);
+        if (!best || out.length < best.length) best = out;
+        if (dataURLBytes(out) <= maxBytes) return best;
+      }
+      if (edge <= DV.config.MIN_IMAGE_EDGE) return best;
+      edge = Math.max(DV.config.MIN_IMAGE_EDGE, Math.round(edge * 0.8));
+    }
+  }
+
+  /** Compresses an uploaded image file into a compact data URL. */
+  async function imageToDataURL(file) {
+    if (!file || !file.type.startsWith('image/')) throw new Error('Please choose an image file.');
+    const url = URL.createObjectURL(file);
+    try {
+      return await compressImage(url);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  /** Recompresses an already-stored data URL if it's over budget; returns the smaller of old and new. */
+  async function shrinkDataURL(url) {
+    if (!url.startsWith('data:image/') || dataURLBytes(url) <= DV.config.MAX_IMAGE_BYTES) return url;
+    try {
+      const out = await compressImage(url);
+      return out.length < url.length ? out : url;
+    } catch {
+      return url;
+    }
+  }
+
+  return { exportJSON, exportCSV, parseImport, readText, imageToDataURL, shrinkDataURL, dataURLBytes };
 })();

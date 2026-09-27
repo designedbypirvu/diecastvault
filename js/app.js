@@ -78,11 +78,11 @@
   };
 
   /* ─── Persistence ──────────────────────────────────────────── */
-  /** Saves and applies a new item list. Returns false (and changes nothing) if the browser is out of space. */
-  function commit(next) {
-    const result = store.save(next);
+  /** Saves and applies a new item list. Resolves false (and changes nothing) if the browser is out of space. */
+  async function commit(next) {
+    const result = await store.save(next);
     if (result === 'quota') {
-      toast('Browser storage is full. Try a smaller photo, or export a backup and remove some models.', { type: 'error' });
+      toast('Browser storage is full. Export a backup and remove some models, or free up space on this device.', { type: 'error' });
       return false;
     }
     if (result === 'unavailable' && !storageWarned) {
@@ -95,6 +95,36 @@
   }
 
   const savePrefs = () => store.savePrefs({ sort: state.sort, view: state.view });
+
+  const fmtBytes = (n) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+  /** Recompresses stored photos that are over the size budget (e.g. saved by an older version, or imported). */
+  let compacting = false;
+  async function compactPhotos() {
+    if (compacting) return;
+    const heavy = state.items.filter((it) => it.image.startsWith('data:') && io.dataURLBytes(it.image) > C.MAX_IMAGE_BYTES);
+    if (!heavy.length) return;
+    compacting = true;
+    try {
+      const shrunk = new Map(); // original data URL -> compressed one
+      let saved = 0;
+      for (const it of heavy) {
+        const image = await io.shrinkDataURL(it.image);
+        if (image !== it.image) {
+          shrunk.set(it.image, image);
+          saved += io.dataURLBytes(it.image) - io.dataURLBytes(image);
+        }
+      }
+      if (!shrunk.size) return;
+      // Apply to the current list so edits made meanwhile are kept; a photo replaced meanwhile won't match.
+      const next = state.items.map((it) => (shrunk.has(it.image) ? { ...it, image: shrunk.get(it.image) } : it));
+      if (await commit(next)) {
+        toast(`Compressed ${shrunk.size} photo${shrunk.size === 1 ? '' : 's'} — freed ${fmtBytes(saved)}.`, { type: 'info' });
+      }
+    } finally {
+      compacting = false;
+    }
+  }
 
   /* ─── Filtering & sorting ──────────────────────────────────── */
   function getVisible() {
@@ -571,8 +601,10 @@
     requestAnimationFrame(() => (item ? form.model : form.diecast).focus());
   }
 
-  function submitForm(e) {
+  let submitting = false;
+  async function submitForm(e) {
     e.preventDefault();
+    if (submitting) return;
     clearErrors();
     const data = {
       diecastBrand: readChoice(form.diecast, form.diecastCustom),
@@ -607,9 +639,14 @@
       next = [{ id: store.uid(), ...data, createdAt: now, updatedAt: now }, ...state.items];
       message = `${data.carBrand} ${data.model} added to your vault.`;
     }
-    if (commit(next)) {
-      closeModal(els.formModal);
-      toast(message);
+    submitting = true;
+    try {
+      if (await commit(next)) {
+        closeModal(els.formModal);
+        toast(message);
+      }
+    } finally {
+      submitting = false;
     }
   }
 
@@ -618,8 +655,11 @@
     if (file.size > 25 * 1024 * 1024) { toast('That image is over 25 MB — please pick a smaller one.', { type: 'error' }); return; }
     form.dropzone.classList.add('is-busy');
     try {
-      setPhoto(await io.imageToDataURL(file));
+      const photo = await io.imageToDataURL(file);
+      setPhoto(photo);
       form.url.value = '';
+      const size = io.dataURLBytes(photo);
+      if (file.size > size * 1.5) toast(`Photo compressed: ${fmtBytes(file.size)} → ${fmtBytes(size)}.`, { type: 'info', duration: 2600 });
     } catch (err) {
       toast(err.message, { type: 'error' });
     } finally {
@@ -682,12 +722,12 @@
     openModal(els.detailModal);
   }
 
-  function toggleShelf(id) {
+  async function toggleShelf(id) {
     const item = state.items.find((i) => i.id === id);
     if (!item) return;
     const shelved = !item.shelved;
     const next = state.items.map((it) => (it.id === id ? { ...it, shelved, updatedAt: Date.now() } : it));
-    if (!commit(next)) return;
+    if (!(await commit(next))) return;
     openDetail(id);
     toast(shelved ? `${item.carBrand} ${item.model} is on the shelf.` : `${item.carBrand} ${item.model} taken off the shelf.`);
   }
@@ -710,7 +750,7 @@
     });
     if (choice !== 'delete') return;
     const index = state.items.indexOf(item);
-    if (!commit(state.items.filter((i) => i.id !== id))) return;
+    if (!(await commit(state.items.filter((i) => i.id !== id)))) return;
     closeModal(els.detailModal);
     toast(`Deleted ${item.carBrand} ${item.model}.`, {
       type: 'info',
@@ -759,7 +799,7 @@
     });
     if (third !== 'delete') return;
 
-    if (!commit([])) return;
+    if (!(await commit([]))) return;
     clearFilters();
     toast(`Deleted all ${plural}.`, {
       type: 'info',
@@ -807,8 +847,9 @@
       next = [...byId.values()];
       message = `Merged: ${added} added, ${items.length - added} updated${note}.`;
     }
-    if (commit(next)) {
+    if (await commit(next)) {
       toast(message, previous.length ? { action: { label: 'Undo', run: () => commit(previous) } } : {});
+      compactPhotos();
     }
   }
 
@@ -911,7 +952,7 @@
       if (act === 'add') openForm();
       if (act === 'import') els.importInput.click();
       if (act === 'clear') clearFilters();
-      if (act === 'demo' && commit(DV.seed())) toast('Demo collection loaded.');
+      if (act === 'demo') commit(DV.seed()).then((ok) => ok && toast('Demo collection loaded.'));
     });
 
     // Detail modal
@@ -1001,16 +1042,20 @@
     onScroll();
 
     // Keep multiple tabs in sync
-    window.addEventListener('storage', (e) => {
-      if (e.key !== C.STORAGE_KEY) return;
-      state.items = store.load() ?? [];
+    store.onExternalChange(async () => {
+      state.items = (await store.load()) ?? [];
       renderAll();
     });
   }
 
   /* ─── Boot ─────────────────────────────────────────────────── */
-  function init() {
-    let items = store.load();
+  async function init() {
+    let items = null;
+    try {
+      items = await store.load();
+    } catch {
+      /* unreadable storage — start from the demo set rather than a blank screen */
+    }
     if (items === null) {
       items = DV.seed();
       store.save(items);
@@ -1025,6 +1070,7 @@
     bindEvents();
     renderAll();
     requestAnimationFrame(() => document.body.classList.add('is-ready'));
+    compactPhotos();
   }
 
   init();
