@@ -292,17 +292,11 @@ kbd {
 
 .brand { display: inline-flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; }
 .brand__mark {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  color: var(--accent);
-  background: linear-gradient(145deg, rgba(0, 229, 255, 0.18), rgba(0, 229, 255, 0.02));
-  border: 1px solid rgba(0, 229, 255, 0.3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 24px -6px var(--accent-glow);
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 14px rgba(0, 229, 255, 0.25));
 }
-.brand__mark .icon { width: 20px; height: 20px; }
 .brand__name { font: 500 18px/1 var(--font-display); letter-spacing: -0.02em; }
 .brand__name b { font-weight: 700; color: var(--accent); margin-left: 1px; }
 
