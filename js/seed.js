@@ -42,6 +42,7 @@ DV.seed = (() => {
         scale: '1:64',
         series,
         condition,
+        shelved: false,
         image: photo(photoId),
         createdAt,
         updatedAt: createdAt,

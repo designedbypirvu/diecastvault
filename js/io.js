@@ -33,7 +33,7 @@ DV.io = (() => {
   };
 
   function exportCSV(items) {
-    const header = ['#', 'Diecast Brand', 'Car Brand', 'Model', 'Scale', 'Series / Year', 'Condition', 'Photo', 'Date Added'];
+    const header = ['#', 'Diecast Brand', 'Car Brand', 'Model', 'Scale', 'Series / Year', 'Condition', 'Shelved', 'Photo', 'Date Added'];
     const lines = items.map((it, i) => [
       i + 1,
       it.diecastBrand,
@@ -42,6 +42,7 @@ DV.io = (() => {
       it.scale,
       it.series,
       it.condition,
+      it.shelved ? 'Yes' : 'No',
       it.image.startsWith('data:') ? '(uploaded photo — see JSON backup)' : it.image,
       new Date(it.createdAt).toISOString().slice(0, 10),
     ].map(csvCell).join(','));

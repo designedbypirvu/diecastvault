@@ -115,7 +115,10 @@
 
     <div class="results-meta">
       <p id="resultCount" aria-live="polite"></p>
-      <button type="button" class="link-btn" id="clearFilters" hidden><i data-lucide="rotate-ccw"></i>Clear filters</button>
+      <div class="results-meta__actions">
+        <button type="button" class="link-btn" id="clearFilters" hidden><i data-lucide="rotate-ccw"></i>Clear filters</button>
+        <button type="button" class="link-btn link-btn--danger" id="deleteAll" hidden><i data-lucide="trash-2"></i>Delete all</button>
+      </div>
     </div>
 
     <section id="grid" class="grid" aria-label="Your collection"></section>
@@ -176,6 +179,20 @@
           <div class="pills" id="fCondition"></div>
         </fieldset>
 
+        <fieldset class="field field--full">
+          <legend>Display shelf</legend>
+          <div class="pills">
+            <label class="pill-option pill-option--shelf">
+              <input type="radio" name="shelved" value="yes">
+              <span><i data-lucide="library"></i>On the shelf</span>
+            </label>
+            <label class="pill-option pill-option--loose">
+              <input type="radio" name="shelved" value="no" checked>
+              <span><i data-lucide="archive"></i>Not shelved</span>
+            </label>
+          </div>
+        </fieldset>
+
         <div class="field field--full">
           <span class="label" id="photoLabel">Photo <span class="opt">optional</span></span>
           <div class="photo" aria-labelledby="photoLabel">
@@ -221,6 +238,7 @@
       <div class="confirm__icon" id="confirmIcon"></div>
       <h2 id="confirmTitle"></h2>
       <p id="confirmBody"></p>
+      <input class="input confirm__input" id="confirmInput" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Confirmation text" hidden>
       <div class="confirm__actions" id="confirmActions"></div>
     </div>
   </dialog>

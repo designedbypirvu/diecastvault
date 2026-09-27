@@ -38,6 +38,7 @@ DV.store = (() => {
       scale: str(raw.scale) || '1:64',
       series: str(raw.series),
       condition: normalizeCondition(raw.condition),
+      shelved: raw.shelved === true || /^(true|yes|1)$/i.test(str(raw.shelved)),
       image: isSafeImage(image) ? image : '',
       createdAt: toTime(raw.createdAt, now),
       updatedAt: 0,

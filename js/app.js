@@ -45,6 +45,7 @@
     search: '',
     diecast: '',
     car: '',
+    shelf: '',               // '' | 'on' | 'off'
     sort: C.SORTS.some((s) => s.value === prefs.sort) ? prefs.sort : 'newest',
     view: prefs.view === 'list' ? 'list' : 'grid',
   };
@@ -62,6 +63,7 @@
     chips: $('#chips'),
     resultCount: $('#resultCount'),
     clearFilters: $('#clearFilters'),
+    deleteAll: $('#deleteAll'),
     grid: $('#grid'),
     empty: $('#emptyState'),
     toasts: $('#toasts'),
@@ -100,6 +102,7 @@
     const list = state.items.filter((it) => {
       if (state.diecast && it.diecastBrand !== state.diecast) return false;
       if (state.car && it.carBrand !== state.car) return false;
+      if (state.shelf && it.shelved !== (state.shelf === 'on')) return false;
       if (!terms.length) return true;
       const hay = fold(`${it.diecastBrand} ${it.carBrand} ${it.model} ${it.series}`);
       return terms.every((t) => hay.includes(t));
@@ -113,7 +116,7 @@
     return list.sort(sorters[state.sort]);
   }
 
-  const hasFilters = () => Boolean(state.search.trim() || state.diecast || state.car);
+  const hasFilters = () => Boolean(state.search.trim() || state.diecast || state.car || state.shelf);
 
   /* ─── Rendering: stats ─────────────────────────────────────── */
   function renderStats() {
@@ -195,13 +198,15 @@
   function renderChips() {
     const chips = [
       { type: 'all', label: 'All', count: state.items.length },
+      { type: 'shelf', value: 'on', label: 'On shelf', count: state.items.filter((i) => i.shelved).length },
+      { type: 'shelf', value: 'off', label: 'Not shelved', count: state.items.filter((i) => !i.shelved).length },
       ...countBy(state.items, 'diecastBrand').slice(0, 2).map(([v, n]) => ({ type: 'diecast', value: v, label: v, count: n })),
       ...countBy(state.items, 'carBrand').slice(0, 5).map(([v, n]) => ({ type: 'car', value: v, label: v, count: n })),
     ];
     els.chips.hidden = state.items.length === 0;
     els.chips.innerHTML = chips.map((c) => `
       <button type="button" class="chip chip--${c.type}" data-chip-type="${c.type}" data-chip-value="${esc(c.value ?? '')}" aria-pressed="false">
-        ${c.type === 'diecast' ? '<i data-lucide="factory"></i>' : ''}${esc(c.label)}<span class="chip__count">${c.count}</span>
+        ${c.type === 'diecast' ? '<i data-lucide="factory"></i>' : c.value === 'on' ? '<i data-lucide="library"></i>' : ''}${esc(c.label)}<span class="chip__count">${c.count}</span>
       </button>`).join('');
     hydrateIcons(els.chips);
     syncChipState();
@@ -210,7 +215,8 @@
   function syncChipState() {
     $$('.chip', els.chips).forEach((chip) => {
       const { chipType: type, chipValue: value } = chip.dataset;
-      const active = type === 'all' ? !state.diecast && !state.car
+      const active = type === 'all' ? !state.diecast && !state.car && !state.shelf
+        : type === 'shelf' ? state.shelf === value
         : type === 'diecast' ? state.diecast === value
         : state.car === value;
       chip.classList.toggle('is-active', active);
@@ -257,7 +263,10 @@
         <h3 class="card__title"><span class="card__make">${esc(item.carBrand)}</span> ${esc(item.model)}</h3>
         <div class="card__meta">
           <span class="card__series">${esc(item.series || 'No series')}</span>
-          ${conditionPill(item.condition)}
+          <span class="card__pills">
+            ${item.shelved ? '<span class="pill pill--shelf" title="On the display shelf"><i data-lucide="library"></i>On shelf</span>' : ''}
+            ${conditionPill(item.condition)}
+          </span>
         </div>
       </div>`;
     hydrateIcons(el);
@@ -305,6 +314,7 @@
         : `<b>${total}</b> model${total === 1 ? '' : 's'} in your vault`)
       : '';
     els.clearFilters.hidden = !hasFilters();
+    els.deleteAll.hidden = !total || hasFilters(); // it wipes everything, so don't offer it beside a filtered view
     syncChipState();
     renderEmpty();
   }
@@ -402,9 +412,18 @@
     });
   });
 
-  /** Promise-based confirm dialog. Resolves to the chosen action value, or null if dismissed. */
-  function ask({ title, body, icon = 'alert-triangle', tone = 'danger', actions }) {
+  /**
+   * Promise-based confirm dialog. Resolves to the chosen action value, or null if dismissed.
+   * With `confirmText`, the last (primary) action stays disabled until that word is typed.
+   */
+  async function ask({ title, body, icon = 'alert-triangle', tone = 'danger', actions, confirmText }) {
     const dlg = els.confirmModal;
+    // Chained asks: let the previous one finish its close animation before reusing the dialog
+    if (dlg.open) await new Promise((r) => dlg.addEventListener('close', r, { once: true }));
+    const input = $('#confirmInput', dlg);
+    input.hidden = !confirmText;
+    input.value = '';
+    input.placeholder = confirmText ? `Type ${confirmText}` : '';
     $('#confirmTitle', dlg).textContent = title;
     $('#confirmBody', dlg).textContent = body;
     const iconWrap = $('#confirmIcon', dlg);
@@ -413,6 +432,8 @@
     $('#confirmActions', dlg).innerHTML = actions.map((a, i) =>
       `<button type="button" class="btn btn--${a.variant || 'ghost'}" data-value="${i}">${esc(a.label)}</button>`).join('');
     hydrateIcons(dlg);
+    const primary = $$('[data-value]', dlg).pop();
+    if (confirmText) primary.disabled = true;
 
     return new Promise((resolve) => {
       const onClick = (e) => {
@@ -422,16 +443,23 @@
         closeModal(dlg);
         resolve(actions[Number(btn.dataset.value)].value);
       };
+      const onInput = () => { primary.disabled = input.value.trim().toUpperCase() !== confirmText; };
+      const onKey = (e) => { if (e.key === 'Enter' && !primary.disabled) primary.click(); };
       const onClose = () => { cleanup(); resolve(null); };
       const cleanup = () => {
         dlg.removeEventListener('click', onClick);
         dlg.removeEventListener('close', onClose);
+        input.removeEventListener('input', onInput);
+        input.removeEventListener('keydown', onKey);
       };
       dlg.addEventListener('click', onClick);
       dlg.addEventListener('close', onClose, { once: true });
+      if (confirmText) {
+        input.addEventListener('input', onInput);
+        input.addEventListener('keydown', onKey);
+      }
       openModal(dlg);
-      const primary = $$('[data-value]', dlg).pop();
-      primary?.focus();
+      (confirmText ? input : primary)?.focus();
     });
   }
 
@@ -527,6 +555,7 @@
       const radio = $$('input[name="condition"]', form.conditions).find((r) => r.value === item.condition);
       if (radio) radio.checked = true;
     }
+    $(`input[name="shelved"][value="${item?.shelved ? 'yes' : 'no'}"]`, els.form).checked = true;
 
     const img = item?.image ?? '';
     form.url.value = img && !img.startsWith('data:') ? img : '';
@@ -552,6 +581,7 @@
       scale: readChoice(form.scale, form.scaleCustom),
       series: form.series.value.trim(),
       condition: $('input[name="condition"]:checked', form.conditions)?.value ?? 'Loose',
+      shelved: $('input[name="shelved"]:checked', els.form)?.value === 'yes',
       image: form.photo,
     };
 
@@ -635,6 +665,13 @@
         </header>
         <dl class="specs">
           ${rows.map(([k, v, ic]) => `<div><dt><i data-lucide="${ic}"></i>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}
+          <div>
+            <dt><i data-lucide="library"></i>Display shelf</dt>
+            <dd class="specs__switch">
+              <span>${item.shelved ? 'On the shelf' : 'Not shelved'}</span>
+              <button type="button" class="switch" role="switch" aria-checked="${item.shelved}" aria-label="On the display shelf" data-detail="shelf"></button>
+            </dd>
+          </div>
         </dl>
         <footer class="modal__foot">
           <button type="button" class="btn btn--ghost btn--danger" data-detail="delete"><i data-lucide="trash-2"></i>Delete</button>
@@ -643,6 +680,16 @@
       </div>`;
     hydrateIcons(els.detailCard);
     openModal(els.detailModal);
+  }
+
+  function toggleShelf(id) {
+    const item = state.items.find((i) => i.id === id);
+    if (!item) return;
+    const shelved = !item.shelved;
+    const next = state.items.map((it) => (it.id === id ? { ...it, shelved, updatedAt: Date.now() } : it));
+    if (!commit(next)) return;
+    openDetail(id);
+    toast(shelved ? `${item.carBrand} ${item.model} is on the shelf.` : `${item.carBrand} ${item.model} taken off the shelf.`);
   }
 
   function stepDetail(dir) {
@@ -676,6 +723,48 @@
           commit(restored);
         },
       },
+    });
+  }
+
+  /** Wipes the whole collection behind three confirmations, with a last-chance undo. */
+  async function deleteAll() {
+    const items = state.items;
+    const count = items.length;
+    if (!count) return;
+    const plural = `${count} model${count === 1 ? '' : 's'}`;
+
+    const first = await ask({
+      title: `Delete all ${plural}?`,
+      body: 'Every model and photo in your vault will be removed from this device. Download a backup first if you might want them back.',
+      icon: 'trash-2',
+      actions: [{ label: 'Cancel', value: null }, { label: 'Download backup', value: 'backup' }, { label: 'Continue', value: 'next', variant: 'danger' }],
+    });
+    if (first === 'backup') { exportAs('json'); return; }
+    if (first !== 'next') return;
+
+    const second = await ask({
+      title: 'Are you absolutely sure?',
+      body: `This empties the entire vault: ${plural}, including any you added yourself, not just the demos.`,
+      icon: 'alert-triangle',
+      actions: [{ label: 'Keep my collection', value: null }, { label: 'Yes, delete everything', value: 'next', variant: 'danger' }],
+    });
+    if (second !== 'next') return;
+
+    const third = await ask({
+      title: 'Final check',
+      body: 'Type DELETE to confirm.',
+      icon: 'bomb',
+      confirmText: 'DELETE',
+      actions: [{ label: 'Cancel', value: null }, { label: 'Delete all', value: 'delete', variant: 'danger' }],
+    });
+    if (third !== 'delete') return;
+
+    if (!commit([])) return;
+    clearFilters();
+    toast(`Deleted all ${plural}.`, {
+      type: 'info',
+      duration: 8000,
+      action: { label: 'Undo', run: () => { if (!state.items.length) commit(items); } },
     });
   }
 
@@ -747,7 +836,7 @@
 
   function clearFilters() {
     els.search.value = '';
-    setFilter({ search: '', diecast: '', car: '' });
+    setFilter({ search: '', diecast: '', car: '', shelf: '' });
   }
 
   function setView(view) {
@@ -780,12 +869,14 @@
     els.sort.addEventListener('change', () => { state.sort = els.sort.value; savePrefs(); renderResults(); });
     $$('[data-view]').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
     els.clearFilters.addEventListener('click', clearFilters);
+    els.deleteAll.addEventListener('click', deleteAll);
 
     els.chips.addEventListener('click', (e) => {
       const chip = e.target.closest('.chip');
       if (!chip) return;
       const { chipType: type, chipValue: value } = chip.dataset;
-      if (type === 'all') setFilter({ diecast: '', car: '' });
+      if (type === 'all') setFilter({ diecast: '', car: '', shelf: '' });
+      else if (type === 'shelf') setFilter({ shelf: state.shelf === value ? '' : value });
       else if (type === 'diecast') setFilter({ diecast: state.diecast === value ? '' : value });
       else setFilter({ car: state.car === value ? '' : value });
     });
@@ -830,6 +921,7 @@
       const act = e.target.closest('[data-detail]')?.dataset.detail;
       if (act === 'edit') openForm(state.items.find((i) => i.id === detailId));
       if (act === 'delete') deleteItem(detailId);
+      if (act === 'shelf') toggleShelf(detailId);
     });
     els.detailModal.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight') stepDetail(1);
