@@ -43,6 +43,7 @@ DV.seed = (() => {
         series,
         condition,
         shelved: false,
+        wishlist: false,
         image: photo(photoId),
         createdAt,
         updatedAt: createdAt,

@@ -30,6 +30,7 @@ DV.store = (() => {
     if (!raw || typeof raw !== 'object') return null;
     const now = Date.now();
     const image = str(raw.image);
+    const wishlist = raw.wishlist === true || /^(true|yes|1)$/i.test(str(raw.wishlist));
     const item = {
       id: str(raw.id) || uid(),
       diecastBrand: str(raw.diecastBrand),
@@ -38,7 +39,8 @@ DV.store = (() => {
       scale: str(raw.scale) || '1:64',
       series: str(raw.series),
       condition: normalizeCondition(raw.condition),
-      shelved: raw.shelved === true || /^(true|yes|1)$/i.test(str(raw.shelved)),
+      shelved: !wishlist && (raw.shelved === true || /^(true|yes|1)$/i.test(str(raw.shelved))),
+      wishlist,               // true = wanted, not owned yet
       image: isSafeImage(image) ? image : '',
       createdAt: toTime(raw.createdAt, now),
       updatedAt: 0,

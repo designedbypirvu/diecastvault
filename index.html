@@ -83,6 +83,16 @@
     <!-- ─── KPI dashboard ────────────────────────────────────── -->
     <section class="stats" id="stats" aria-label="Collection statistics"></section>
 
+    <!-- ─── Collection / wishlist switch ─────────────────────── -->
+    <div class="tabs" id="sectionTabs" role="tablist" aria-label="Show">
+      <button type="button" role="tab" data-section="collection" aria-selected="true" aria-controls="grid">
+        <i data-lucide="warehouse"></i>Collection<span class="tabs__count" data-count-for="collection">0</span>
+      </button>
+      <button type="button" role="tab" data-section="wishlist" aria-selected="false" aria-controls="grid">
+        <i data-lucide="heart"></i>Wishlist<span class="tabs__count" data-count-for="wishlist">0</span>
+      </button>
+    </div>
+
     <!-- ─── Search, filters & sorting ────────────────────────── -->
     <section class="controls" aria-label="Search and filter the collection">
       <div class="search">
@@ -127,7 +137,7 @@
 
   <footer class="footer container">
     <p>Diecast Vault — saved privately in this browser.</p>
-    <p class="footer__keys"><kbd>/</kbd> search <kbd>N</kbd> new model <kbd>Esc</kbd> close</p>
+    <p class="footer__keys"><kbd>/</kbd> search <kbd>N</kbd> new model <kbd>W</kbd> switch list <kbd>Esc</kbd> close</p>
   </footer>
 
   <!-- ─── Add / edit modal ─────────────────────────────────── -->
@@ -180,7 +190,7 @@
           <div class="pills" id="fCondition"></div>
         </fieldset>
 
-        <fieldset class="field field--full">
+        <fieldset class="field field--full" id="fShelfField">
           <legend>Display shelf</legend>
           <div class="pills">
             <label class="pill-option pill-option--shelf">

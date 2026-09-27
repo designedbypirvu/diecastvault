@@ -42,6 +42,7 @@
   const prefs = store.loadPrefs();
   const state = {
     items: [],
+    section: 'collection',   // 'collection' | 'wishlist'
     search: '',
     diecast: '',
     car: '',
@@ -49,6 +50,10 @@
     sort: C.SORTS.some((s) => s.value === prefs.sort) ? prefs.sort : 'newest',
     view: prefs.view === 'list' ? 'list' : 'grid',
   };
+  const isWish = () => state.section === 'wishlist';
+  /** Items in the list currently being browsed (owned collection or wishlist). */
+  const sectionItems = () => state.items.filter((it) => Boolean(it.wishlist) === isWish());
+
   let visible = [];          // items currently shown, in display order
   let lastVisibleKey = '';
   let storageWarned = false;
@@ -56,6 +61,8 @@
   const els = {
     topbar: $('#topbar'),
     stats: $('#stats'),
+    tabs: $('#sectionTabs'),
+    addLabel: $('#addBtn .btn__label'),
     search: $('#search'),
     filterDiecast: $('#filterDiecast'),
     filterCar: $('#filterCar'),
@@ -129,7 +136,7 @@
   /* ─── Filtering & sorting ──────────────────────────────────── */
   function getVisible() {
     const terms = fold(state.search).split(/\s+/).filter(Boolean);
-    const list = state.items.filter((it) => {
+    const list = sectionItems().filter((it) => {
       if (state.diecast && it.diecastBrand !== state.diecast) return false;
       if (state.car && it.carBrand !== state.car) return false;
       if (state.shelf && it.shelved !== (state.shelf === 'on')) return false;
@@ -150,13 +157,12 @@
 
   /* ─── Rendering: stats ─────────────────────────────────────── */
   function renderStats() {
-    const items = state.items;
+    const items = state.items.filter((i) => !i.wishlist);
+    const wishes = state.items.filter((i) => i.wishlist);
     const total = items.length;
     const [topDiecast] = countBy(items, 'diecastBrand');
     const [topCar] = countBy(items, 'carBrand');
-    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
-    const thisMonth = items.filter((i) => i.createdAt >= monthStart).length;
-    const latest = items.reduce((a, b) => (!a || b.createdAt > a.createdAt ? b : a), null);
+    const latestWish = wishes.reduce((a, b) => (!a || b.createdAt > a.createdAt ? b : a), null);
     const pct = (n) => (total ? Math.round((n / total) * 100) : 0);
     const uniq = (k) => new Set(items.map((i) => i[k])).size;
 
@@ -176,19 +182,23 @@
         meter: topCar ? pct(topCar[1]) : 0,
       },
       {
-        label: 'Added this month', icon: 'calendar-plus', value: thisMonth, numeric: true,
-        sub: latest ? `Latest: ${latest.carBrand} ${latest.model}` : 'Nothing added yet',
-        meter: pct(thisMonth),
+        label: 'Wishlist', icon: 'heart', value: wishes.length, numeric: true, goto: 'wishlist',
+        sub: latestWish ? `Latest: ${latestWish.carBrand} ${latestWish.model}` : 'Nothing on your wishlist yet',
       },
     ];
 
-    els.stats.innerHTML = tiles.map((t) => `
-      <article class="stat${t.accent ? ' stat--accent' : ''}">
+    els.stats.innerHTML = tiles.map((t) => {
+      const tag = t.goto ? 'a' : 'article';
+      const attrs = t.goto ? ` href="#sectionTabs" data-goto="${t.goto}" aria-label="${esc(`${t.label}: ${t.value}. Open wishlist`)}"` : '';
+      return `
+      <${tag} class="stat${t.accent ? ' stat--accent' : ''}${t.goto ? ' stat--link' : ''}"${attrs}>
         <div class="stat__head"><span>${esc(t.label)}</span><i data-lucide="${t.icon}"></i></div>
         <p class="stat__value${t.numeric ? ' is-num' : ''}" ${t.numeric ? `data-count="${t.value}"` : ''} title="${esc(t.value)}">${t.numeric ? '0' : esc(t.value)}</p>
         <p class="stat__sub">${esc(t.sub)}</p>
         ${t.meter != null ? `<div class="stat__meter"><span style="--w:${t.meter}%"></span></div>` : ''}
-      </article>`).join('');
+        ${t.goto ? '<span class="stat__go" aria-hidden="true">View wishlist<i data-lucide="arrow-right"></i></span>' : ''}
+      </${tag}>`;
+    }).join('');
     hydrateIcons(els.stats);
     $$('[data-count]', els.stats).forEach(countUp);
   }
@@ -217,8 +227,9 @@
   }
 
   function renderFilterOptions() {
-    const diecast = countBy(state.items, 'diecastBrand');
-    const car = countBy(state.items, 'carBrand');
+    const items = sectionItems();
+    const diecast = countBy(items, 'diecastBrand');
+    const car = countBy(items, 'carBrand');
     if (state.diecast && !diecast.some(([v]) => v === state.diecast)) state.diecast = '';
     if (state.car && !car.some(([v]) => v === state.car)) state.car = '';
     fillFilterSelect(els.filterDiecast, diecast, 'All manufacturers', state.diecast);
@@ -226,14 +237,17 @@
   }
 
   function renderChips() {
+    const items = sectionItems();
     const chips = [
-      { type: 'all', label: 'All', count: state.items.length },
-      { type: 'shelf', value: 'on', label: 'On shelf', count: state.items.filter((i) => i.shelved).length },
-      { type: 'shelf', value: 'off', label: 'Not shelved', count: state.items.filter((i) => !i.shelved).length },
-      ...countBy(state.items, 'diecastBrand').slice(0, 2).map(([v, n]) => ({ type: 'diecast', value: v, label: v, count: n })),
-      ...countBy(state.items, 'carBrand').slice(0, 5).map(([v, n]) => ({ type: 'car', value: v, label: v, count: n })),
+      { type: 'all', label: 'All', count: items.length },
+      ...(isWish() ? [] : [
+        { type: 'shelf', value: 'on', label: 'On shelf', count: items.filter((i) => i.shelved).length },
+        { type: 'shelf', value: 'off', label: 'Not shelved', count: items.filter((i) => !i.shelved).length },
+      ]),
+      ...countBy(items, 'diecastBrand').slice(0, 2).map(([v, n]) => ({ type: 'diecast', value: v, label: v, count: n })),
+      ...countBy(items, 'carBrand').slice(0, 5).map(([v, n]) => ({ type: 'car', value: v, label: v, count: n })),
     ];
-    els.chips.hidden = state.items.length === 0;
+    els.chips.hidden = items.length === 0;
     els.chips.innerHTML = chips.map((c) => `
       <button type="button" class="chip chip--${c.type}" data-chip-type="${c.type}" data-chip-value="${esc(c.value ?? '')}" aria-pressed="false">
         ${c.type === 'diecast' ? '<i data-lucide="factory"></i>' : c.value === 'on' ? '<i data-lucide="library"></i>' : ''}${esc(c.label)}<span class="chip__count">${c.count}</span>
@@ -277,7 +291,7 @@
     el.className = 'card';
     el.tabIndex = 0;
     el.dataset.id = item.id;
-    el.dataset.sig = String(item.updatedAt);
+    el.dataset.sig = cardSig(item);
     el.setAttribute('aria-label', `${item.diecastBrand} ${item.carBrand} ${item.model}, ${item.scale}`);
     el.innerHTML = `
       <div class="card__media media" data-media>
@@ -285,6 +299,7 @@
         <span class="badge">${esc(item.diecastBrand)}</span>
         <span class="scale-tag">${esc(item.scale)}</span>
         <div class="card__actions">
+          ${item.wishlist ? `<button type="button" class="icon-btn icon-btn--glass icon-btn--got" data-action="acquire" aria-label="Got ${esc(item.model)} — move to collection" title="Got it — move to collection"><i data-lucide="package-plus"></i></button>` : ''}
           <button type="button" class="icon-btn icon-btn--glass" data-action="edit" aria-label="Edit ${esc(item.model)}" title="Edit"><i data-lucide="pencil"></i></button>
           <button type="button" class="icon-btn icon-btn--glass icon-btn--danger" data-action="delete" aria-label="Delete ${esc(item.model)}" title="Delete"><i data-lucide="trash-2"></i></button>
         </div>
@@ -292,6 +307,7 @@
       <div class="card__body">
         <h3 class="card__title"><span class="card__make">${esc(item.carBrand)}</span> ${esc(item.model)}</h3>
         <div class="card__inline-actions">
+          ${item.wishlist ? `<button type="button" class="icon-btn card__btn icon-btn--got" data-action="acquire" aria-label="Got ${esc(item.model)} — move to collection" title="Got it — move to collection"><i data-lucide="package-plus"></i></button>` : ''}
           <button type="button" class="icon-btn card__btn" data-action="edit" aria-label="Edit ${esc(item.model)}" title="Edit"><i data-lucide="pencil"></i></button>
           <button type="button" class="icon-btn card__btn icon-btn--danger" data-action="delete" aria-label="Delete ${esc(item.model)}" title="Delete"><i data-lucide="trash-2"></i></button>
         </div>
@@ -309,6 +325,8 @@
     return el;
   }
 
+  const cardSig = (item) => `${item.updatedAt}${item.wishlist ? 'w' : ''}`;
+
   /** Creates/updates/removes card elements to mirror state.items. */
   function syncCards() {
     const ids = new Set(state.items.map((i) => i.id));
@@ -317,7 +335,7 @@
     }
     state.items.forEach((item) => {
       const existing = cardEls.get(item.id);
-      if (existing && existing.dataset.sig === String(item.updatedAt)) return;
+      if (existing && existing.dataset.sig === cardSig(item)) return;
       const el = createCard(item);
       if (existing) existing.replaceWith(el);
       cardEls.set(item.id, el);
@@ -343,23 +361,49 @@
       els.grid.replaceChildren(frag);
     }
 
-    const total = state.items.length;
+    const total = sectionItems().length;
     els.resultCount.innerHTML = total
       ? (hasFilters()
-        ? `Showing <b>${visible.length}</b> of ${total} models`
-        : `<b>${total}</b> model${total === 1 ? '' : 's'} in your vault`)
+        ? `Showing <b>${visible.length}</b> of ${total} ${isWish() ? 'on your wishlist' : 'models'}`
+        : `<b>${total}</b> model${total === 1 ? '' : 's'} ${isWish() ? 'on your wishlist' : 'in your vault'}`)
       : '';
     els.clearFilters.hidden = !hasFilters();
-    els.deleteAll.hidden = !total || hasFilters(); // it wipes everything, so don't offer it beside a filtered view
+    els.deleteAll.hidden = !total || hasFilters(); // it wipes the whole list, so don't offer it beside a filtered view
     syncChipState();
     renderEmpty();
   }
 
+  function renderTabs() {
+    const wishes = state.items.filter((i) => i.wishlist).length;
+    const counts = { collection: state.items.length - wishes, wishlist: wishes };
+    $$('[data-section]', els.tabs).forEach((b) => b.setAttribute('aria-selected', String(b.dataset.section === state.section)));
+    $$('[data-count-for]', els.tabs).forEach((c) => { c.textContent = counts[c.dataset.countFor]; });
+    els.addLabel.textContent = isWish() ? 'Add wish' : 'Add model';
+    els.search.placeholder = isWish() ? 'Search your wishlist…' : 'Search models & brands…';
+  }
+
   function renderEmpty() {
-    const total = state.items.length;
+    const total = sectionItems().length;
     if (visible.length) { els.empty.hidden = true; return; }
     els.empty.hidden = false;
-    if (!total) {
+    if (!total && isWish()) {
+      els.empty.innerHTML = `
+        <div class="empty__art empty__art--wish"><i data-lucide="heart"></i></div>
+        <h2>Your wishlist is empty</h2>
+        <p>Keep track of the castings you’re hunting for. When you find one, tap <b>Got it</b> to move it into your collection.</p>
+        <div class="empty__actions">
+          <button type="button" class="btn btn--primary" data-empty="add"><i data-lucide="plus"></i>Add to wishlist</button>
+        </div>`;
+    } else if (!total && state.items.length) {
+      els.empty.innerHTML = `
+        <div class="empty__art"><i data-lucide="warehouse"></i></div>
+        <h2>No models in your collection yet</h2>
+        <p>Add a model you own, or mark one from your wishlist as <b>Got it</b>.</p>
+        <div class="empty__actions">
+          <button type="button" class="btn btn--primary" data-empty="add"><i data-lucide="plus"></i>Add a model</button>
+          <button type="button" class="btn btn--ghost" data-empty="wishlist"><i data-lucide="heart"></i>Open wishlist</button>
+        </div>`;
+    } else if (!total) {
       els.empty.innerHTML = `
         <div class="empty__art"><i data-lucide="warehouse"></i></div>
         <h2>Your vault is empty</h2>
@@ -385,6 +429,7 @@
   function renderAll() {
     syncCards();
     renderStats();
+    renderTabs();
     renderFilterOptions();
     renderChips();
     renderResults({ force: true });
@@ -505,6 +550,7 @@
   /* ─── Add / edit form ──────────────────────────────────────── */
   const form = {
     editingId: null,
+    wishlist: false,
     photo: '',
     diecast: $('#fDiecast'),
     diecastCustom: $('#fDiecastCustom'),
@@ -574,6 +620,7 @@
 
   function openForm(item = null) {
     form.editingId = item?.id ?? null;
+    form.wishlist = item ? item.wishlist : isWish();
     els.form.reset();
     clearErrors();
 
@@ -601,14 +648,15 @@
       if (radio) radio.checked = true;
     }
     $(`input[name="shelved"][value="${item?.shelved ? 'yes' : 'no'}"]`, els.form).checked = true;
+    $('#fShelfField').hidden = form.wishlist; // you can't shelve a car you don't own yet
 
     const img = item?.image ?? '';
     form.url.value = img && !img.startsWith('data:') ? img : '';
     setPhoto(img, { tab: img && !img.startsWith('data:') ? 'url' : 'upload' });
 
-    $('#formEyebrow').textContent = item ? 'Edit entry' : 'New entry';
-    $('#formTitle').textContent = item ? `${item.carBrand} ${item.model}` : 'Add a model';
-    $('#formSubmit span').textContent = item ? 'Save changes' : 'Add to collection';
+    $('#formEyebrow').textContent = item ? (form.wishlist ? 'Edit wish' : 'Edit entry') : (form.wishlist ? 'New wish' : 'New entry');
+    $('#formTitle').textContent = item ? `${item.carBrand} ${item.model}` : (form.wishlist ? 'Add to wishlist' : 'Add a model');
+    $('#formSubmit span').textContent = item ? 'Save changes' : (form.wishlist ? 'Add to wishlist' : 'Add to collection');
 
     hydrateIcons(els.form);
     closeModal(els.detailModal);
@@ -628,7 +676,8 @@
       scale: readChoice(form.scale, form.scaleCustom),
       series: readChoice(form.series, form.seriesCustom),
       condition: $('input[name="condition"]:checked', form.conditions)?.value ?? 'Loose',
-      shelved: $('input[name="shelved"]:checked', els.form)?.value === 'yes',
+      shelved: !form.wishlist && $('input[name="shelved"]:checked', els.form)?.value === 'yes',
+      wishlist: form.wishlist,
       image: form.photo,
     };
 
@@ -652,7 +701,7 @@
       message = `Saved changes to ${data.carBrand} ${data.model}.`;
     } else {
       next = [{ id: store.uid(), ...data, createdAt: now, updatedAt: now }, ...state.items];
-      message = `${data.carBrand} ${data.model} added to your vault.`;
+      message = `${data.carBrand} ${data.model} added to your ${data.wishlist ? 'wishlist' : 'vault'}.`;
     }
     submitting = true;
     try {
@@ -699,8 +748,22 @@
       ['Scale', item.scale, 'ruler'],
       ['Series', item.series || '—', 'layers'],
       ['Condition', cond.value, cond.icon],
-      ['Added', fmtDate(item.createdAt), 'calendar-days'],
+      [item.wishlist ? 'Wishlisted' : 'Added', fmtDate(item.createdAt), 'calendar-days'],
     ];
+    const shelfRow = item.wishlist ? '' : `
+          <div>
+            <dt><i data-lucide="library"></i>Display shelf</dt>
+            <dd class="specs__switch">
+              <span>${item.shelved ? 'On the shelf' : 'Not shelved'}</span>
+              <button type="button" class="switch" role="switch" aria-checked="${item.shelved}" aria-label="On the display shelf" data-detail="shelf"></button>
+            </dd>
+          </div>`;
+    const footer = item.wishlist ? `
+          <button type="button" class="btn btn--ghost btn--danger" data-detail="delete"><i data-lucide="trash-2"></i>Delete</button>
+          <button type="button" class="btn btn--ghost" data-detail="edit"><i data-lucide="pencil"></i>Edit</button>
+          <button type="button" class="btn btn--primary" data-detail="acquire"><i data-lucide="package-plus"></i>Got it</button>` : `
+          <button type="button" class="btn btn--ghost btn--danger" data-detail="delete"><i data-lucide="trash-2"></i>Delete</button>
+          <button type="button" class="btn btn--primary" data-detail="edit"><i data-lucide="pencil"></i>Edit model</button>`;
     els.detailCard.innerHTML = `
       <div class="detail__media media" data-media>
         ${mediaHTML(item, { eager: true })}
@@ -713,24 +776,16 @@
       <div class="detail__info">
         <header class="modal__head">
           <div>
-            <p class="eyebrow">${esc(item.scale)} · ${esc(item.diecastBrand)}</p>
+            <p class="eyebrow">${item.wishlist ? 'Wishlist · ' : ''}${esc(item.scale)} · ${esc(item.diecastBrand)}</p>
             <h2><span class="card__make">${esc(item.carBrand)}</span> ${esc(item.model)}</h2>
           </div>
           <button type="button" class="icon-btn" data-close aria-label="Close"><i data-lucide="x"></i></button>
         </header>
         <dl class="specs">
           ${rows.map(([k, v, ic]) => `<div><dt><i data-lucide="${ic}"></i>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}
-          <div>
-            <dt><i data-lucide="library"></i>Display shelf</dt>
-            <dd class="specs__switch">
-              <span>${item.shelved ? 'On the shelf' : 'Not shelved'}</span>
-              <button type="button" class="switch" role="switch" aria-checked="${item.shelved}" aria-label="On the display shelf" data-detail="shelf"></button>
-            </dd>
-          </div>
+          ${shelfRow}
         </dl>
-        <footer class="modal__foot">
-          <button type="button" class="btn btn--ghost btn--danger" data-detail="delete"><i data-lucide="trash-2"></i>Delete</button>
-          <button type="button" class="btn btn--primary" data-detail="edit"><i data-lucide="pencil"></i>Edit model</button>
+        <footer class="modal__foot">${footer}
         </footer>
       </div>`;
     hydrateIcons(els.detailCard);
@@ -747,6 +802,26 @@
     toast(shelved ? `${item.carBrand} ${item.model} is on the shelf.` : `${item.carBrand} ${item.model} taken off the shelf.`);
   }
 
+  /** Moves a wishlist entry into the collection, dated now so it shows up as the newest addition. */
+  async function acquire(id) {
+    const item = state.items.find((i) => i.id === id);
+    if (!item?.wishlist) return;
+    const now = Date.now();
+    const next = state.items.map((it) => (it.id === id ? { ...it, wishlist: false, createdAt: now, updatedAt: now } : it));
+    if (!(await commit(next))) return;
+    closeModal(els.detailModal);
+    toast(`${item.carBrand} ${item.model} moved to your collection.`, {
+      action: {
+        label: 'Undo',
+        run: () => {
+          // Only undo if it hasn't been edited since, so later changes aren't thrown away
+          if (state.items.find((i) => i.id === id)?.updatedAt !== now) return;
+          commit(state.items.map((it) => (it.id === id ? item : it)));
+        },
+      },
+    });
+  }
+
   function stepDetail(dir) {
     const idx = visible.findIndex((i) => i.id === detailId);
     if (idx === -1 || visible.length < 2) return;
@@ -758,8 +833,8 @@
     const item = state.items.find((i) => i.id === id);
     if (!item) return;
     const choice = await ask({
-      title: 'Delete this model?',
-      body: `${item.diecastBrand} ${item.carBrand} ${item.model} will be removed from your collection.`,
+      title: item.wishlist ? 'Remove from wishlist?' : 'Delete this model?',
+      body: `${item.diecastBrand} ${item.carBrand} ${item.model} will be removed from your ${item.wishlist ? 'wishlist' : 'collection'}.`,
       icon: 'trash-2',
       actions: [{ label: 'Cancel', value: null }, { label: 'Delete', value: 'delete', variant: 'danger' }],
     });
@@ -781,12 +856,31 @@
     });
   }
 
-  /** Wipes the whole collection behind three confirmations, with a last-chance undo. */
+  /**
+   * Wipes the list being viewed, with a last-chance undo. The collection sits behind three
+   * confirmations; the wishlist (nothing owned is lost) behind one.
+   */
   async function deleteAll() {
-    const items = state.items;
+    const wish = isWish();
+    const items = sectionItems();
+    const others = state.items.filter((i) => Boolean(i.wishlist) !== wish);
     const count = items.length;
     if (!count) return;
     const plural = `${count} model${count === 1 ? '' : 's'}`;
+    const restore = () => { if (!state.items.some((i) => Boolean(i.wishlist) === wish)) commit([...items, ...state.items]); };
+
+    if (wish) {
+      const choice = await ask({
+        title: 'Clear your wishlist?',
+        body: `All ${plural} on your wishlist will be removed. Your collection isn’t affected.`,
+        icon: 'trash-2',
+        actions: [{ label: 'Cancel', value: null }, { label: 'Clear wishlist', value: 'delete', variant: 'danger' }],
+      });
+      if (choice !== 'delete' || !(await commit(others))) return;
+      clearFilters();
+      toast(`Cleared ${plural} from your wishlist.`, { type: 'info', duration: 8000, action: { label: 'Undo', run: restore } });
+      return;
+    }
 
     const first = await ask({
       title: `Delete all ${plural}?`,
@@ -814,12 +908,12 @@
     });
     if (third !== 'delete') return;
 
-    if (!(await commit([]))) return;
+    if (!(await commit(others))) return;
     clearFilters();
     toast(`Deleted all ${plural}.`, {
       type: 'info',
       duration: 8000,
-      action: { label: 'Undo', run: () => { if (!state.items.length) commit(items); } },
+      action: { label: 'Undo', run: restore },
     });
   }
 
@@ -895,6 +989,18 @@
     setFilter({ search: '', diecast: '', car: '', shelf: '' });
   }
 
+  /** Switches between the owned collection and the wishlist; filters start fresh on each side. */
+  function setSection(section) {
+    if (section === state.section) return;
+    state.section = section;
+    els.search.value = '';
+    Object.assign(state, { search: '', diecast: '', car: '', shelf: '' });
+    renderTabs();
+    renderFilterOptions();
+    renderChips();
+    renderResults({ force: true });
+  }
+
   function setView(view) {
     state.view = view;
     $$('[data-view]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
@@ -917,6 +1023,26 @@
       exportAs(item.dataset.export);
     });
     document.addEventListener('click', (e) => { if (!els.exportMenu.contains(e.target)) setExportMenu(false); });
+
+    // Collection / wishlist
+    els.tabs.addEventListener('click', (e) => {
+      const tab = e.target.closest('[data-section]');
+      if (tab) setSection(tab.dataset.section);
+    });
+    els.tabs.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const tabs = $$('[data-section]', els.tabs);
+      const next = tabs[(tabs.indexOf(document.activeElement) + 1) % tabs.length];
+      next.focus();
+      setSection(next.dataset.section);
+    });
+    els.stats.addEventListener('click', (e) => {
+      const link = e.target.closest('[data-goto]');
+      if (!link) return;
+      e.preventDefault();
+      setSection(link.dataset.goto);
+      els.tabs.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth', block: 'start' });
+    });
 
     // Controls
     els.search.addEventListener('input', () => setFilter({ search: els.search.value }));
@@ -945,6 +1071,7 @@
       const id = card.dataset.id;
       if (action === 'edit') openForm(state.items.find((i) => i.id === id));
       else if (action === 'delete') deleteItem(id);
+      else if (action === 'acquire') acquire(id);
       else openDetail(id);
     });
     els.grid.addEventListener('keydown', (e) => {
@@ -967,6 +1094,7 @@
       if (act === 'add') openForm();
       if (act === 'import') els.importInput.click();
       if (act === 'clear') clearFilters();
+      if (act === 'wishlist') setSection('wishlist');
       if (act === 'demo') commit(DV.seed()).then((ok) => ok && toast('Demo collection loaded.'));
     });
 
@@ -978,6 +1106,7 @@
       if (act === 'edit') openForm(state.items.find((i) => i.id === detailId));
       if (act === 'delete') deleteItem(detailId);
       if (act === 'shelf') toggleShelf(detailId);
+      if (act === 'acquire') acquire(detailId);
     });
     els.detailModal.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight') stepDetail(1);
@@ -1034,6 +1163,7 @@
       if (typing || $('dialog[open]') || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === '/') { e.preventDefault(); els.search.focus(); els.search.select(); }
       if (e.key.toLowerCase() === 'n') { e.preventDefault(); openForm(); }
+      if (e.key.toLowerCase() === 'w') { e.preventDefault(); setSection(isWish() ? 'collection' : 'wishlist'); }
     });
 
     // Background spotlight follows the cursor (pointer devices only)
