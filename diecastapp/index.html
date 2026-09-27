@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Diecast Vault — Collection Manager</title>
+  <meta name="description" content="Organise, search, filter and back up your diecast model car collection.">
+  <meta name="theme-color" content="#0D0F12">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230D0F12'/%3E%3Cpath d='M7 20h18l-2.5-6.5a2 2 0 0 0-1.9-1.3h-9.2a2 2 0 0 0-1.9 1.3z' fill='none' stroke='%2300E5FF' stroke-width='2.2' stroke-linejoin='round'/%3E%3Ccircle cx='11' cy='21' r='2.2' fill='%2300E5FF'/%3E%3Ccircle cx='21' cy='21' r='2.2' fill='%2300E5FF'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://images.unsplash.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true">
+    <span class="orb orb--1"></span>
+    <span class="orb orb--2"></span>
+    <span class="orb orb--3"></span>
+    <span class="orb orb--4"></span>
+    <div class="ambient__grid"></div>
+    <div class="ambient__grid ambient__grid--lit"></div>
+  </div>
+
+  <!-- ─── Top bar ─────────────────────────────────────────────── -->
+  <header class="topbar" id="topbar">
+    <div class="container topbar__inner">
+      <a class="brand" href="#" aria-label="Diecast Vault home">
+        <span class="brand__mark" aria-hidden="true"><i data-lucide="car-front"></i></span>
+        <span class="brand__name">Diecast<b>Vault</b></span>
+      </a>
+
+      <nav class="topbar__actions" aria-label="Collection actions">
+        <button class="btn btn--ghost" id="importBtn" type="button" title="Import a JSON backup">
+          <i data-lucide="upload"></i><span class="btn__label">Import</span>
+        </button>
+
+        <div class="menu" id="exportMenu">
+          <button class="btn btn--ghost" id="exportBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="exportPanel">
+            <i data-lucide="download"></i><span class="btn__label">Export</span><i data-lucide="chevron-down" class="menu__chev"></i>
+          </button>
+          <div class="menu__panel" id="exportPanel" role="menu">
+            <button type="button" role="menuitem" data-export="json">
+              <span class="menu__icon"><i data-lucide="file-json"></i></span>
+              <span><strong>Export as JSON</strong><small>Full backup incl. photos</small></span>
+            </button>
+            <button type="button" role="menuitem" data-export="csv">
+              <span class="menu__icon"><i data-lucide="sheet"></i></span>
+              <span><strong>Export as CSV</strong><small>For Excel &amp; Google Sheets</small></span>
+            </button>
+          </div>
+        </div>
+
+        <button class="btn btn--primary" id="addBtn" type="button">
+          <i data-lucide="plus"></i><span class="btn__label">Add model</span>
+        </button>
+        <input type="file" id="importInput" accept="application/json,.json" hidden>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container" id="main">
+    <!-- ─── Hero ─────────────────────────────────────────────── -->
+    <section class="hero">
+      <div class="hero__stage" aria-hidden="true">
+        <div class="hero__sun"></div>
+        <div class="hero__horizon"></div>
+        <div class="hero__floor"></div>
+        <span class="streak streak--1"></span>
+        <span class="streak streak--2"></span>
+        <span class="streak streak--3"></span>
+        <span class="streak streak--4"></span>
+        <span class="streak streak--5"></span>
+      </div>
+      <p class="eyebrow reveal"><span class="pulse"></span>Collection manager</p>
+      <h1 class="hero__title reveal">Welcome back,<br><em>Cristian.</em></h1>
+      <p class="hero__lede reveal">Catalogue every casting you own — from mainline treasure hunts to premium resin — then search, filter and back it all up in seconds.</p>
+    </section>
+
+    <!-- ─── KPI dashboard ────────────────────────────────────── -->
+    <section class="stats" id="stats" aria-label="Collection statistics"></section>
+
+    <!-- ─── Search, filters & sorting ────────────────────────── -->
+    <section class="controls" aria-label="Search and filter the collection">
+      <div class="search">
+        <i data-lucide="search" class="search__icon"></i>
+        <input id="search" type="search" placeholder="Search models &amp; brands…" autocomplete="off" spellcheck="false" aria-label="Search collection">
+        <kbd class="search__kbd" aria-hidden="true">/</kbd>
+      </div>
+
+      <div class="controls__row">
+        <label class="select">
+          <span class="select__label">Diecast</span>
+          <select id="filterDiecast" aria-label="Filter by diecast manufacturer"></select>
+        </label>
+        <label class="select">
+          <span class="select__label">Car brand</span>
+          <select id="filterCar" aria-label="Filter by car brand"></select>
+        </label>
+        <label class="select">
+          <span class="select__label">Sort</span>
+          <select id="sort" aria-label="Sort collection"></select>
+        </label>
+        <div class="view-toggle" role="group" aria-label="Layout">
+          <button type="button" data-view="grid" aria-label="Grid view" aria-pressed="true"><i data-lucide="layout-grid"></i></button>
+          <button type="button" data-view="list" aria-label="List view" aria-pressed="false"><i data-lucide="rows-3"></i></button>
+        </div>
+      </div>
+    </section>
+
+    <div class="chips" id="chips" role="toolbar" aria-label="Quick filters"></div>
+
+    <div class="results-meta">
+      <p id="resultCount" aria-live="polite"></p>
+      <button type="button" class="link-btn" id="clearFilters" hidden><i data-lucide="rotate-ccw"></i>Clear filters</button>
+    </div>
+
+    <section id="grid" class="grid" aria-label="Your collection"></section>
+    <div id="emptyState" class="empty" hidden></div>
+  </main>
+
+  <footer class="footer container">
+    <p>Diecast Vault — saved privately in this browser.</p>
+    <p class="footer__keys"><kbd>/</kbd> search <kbd>N</kbd> new model <kbd>Esc</kbd> close</p>
+  </footer>
+
+  <!-- ─── Add / edit modal ─────────────────────────────────── -->
+  <dialog class="modal" id="formModal" aria-labelledby="formTitle">
+    <form class="modal__card" id="carForm" novalidate>
+      <header class="modal__head">
+        <div>
+          <p class="eyebrow" id="formEyebrow">New entry</p>
+          <h2 id="formTitle">Add a model</h2>
+        </div>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><i data-lucide="x"></i></button>
+      </header>
+
+      <div class="modal__body form-grid">
+        <div class="field" data-field="diecastBrand">
+          <label for="fDiecast">Diecast brand <span class="req">*</span></label>
+          <select id="fDiecast"></select>
+          <input id="fDiecastCustom" class="input custom-input" type="text" placeholder="Manufacturer name" maxlength="60" hidden>
+          <p class="field__error" role="alert"></p>
+        </div>
+
+        <div class="field" data-field="carBrand">
+          <label for="fCar">Car brand <span class="req">*</span></label>
+          <select id="fCar"></select>
+          <input id="fCarCustom" class="input custom-input" type="text" placeholder="Car brand name" maxlength="60" hidden>
+          <p class="field__error" role="alert"></p>
+        </div>
+
+        <div class="field field--full" data-field="model">
+          <label for="fModel">Car model <span class="req">*</span></label>
+          <input id="fModel" class="input" type="text" placeholder="e.g. 911 GT3 RS, F40, Skyline GT-R R34" maxlength="90" autocomplete="off">
+          <p class="field__error" role="alert"></p>
+        </div>
+
+        <div class="field" data-field="scale">
+          <label for="fScale">Scale <span class="req">*</span></label>
+          <select id="fScale"></select>
+          <input id="fScaleCustom" class="input custom-input" type="text" placeholder="e.g. 1:87" maxlength="12" hidden>
+          <p class="field__error" role="alert"></p>
+        </div>
+
+        <div class="field" data-field="series">
+          <label for="fSeries">Series / release year <span class="opt">optional</span></label>
+          <input id="fSeries" class="input" type="text" placeholder="e.g. Mainline 2023, RLC Special" maxlength="80" autocomplete="off">
+        </div>
+
+        <fieldset class="field field--full">
+          <legend>Condition</legend>
+          <div class="pills" id="fCondition"></div>
+        </fieldset>
+
+        <div class="field field--full">
+          <span class="label" id="photoLabel">Photo <span class="opt">optional</span></span>
+          <div class="photo" aria-labelledby="photoLabel">
+            <div class="photo__preview media" id="photoPreview" data-media></div>
+            <div class="photo__inputs">
+              <div class="segmented" role="tablist" aria-label="Photo source">
+                <button type="button" role="tab" data-photo-tab="upload" aria-selected="true">Upload</button>
+                <button type="button" role="tab" data-photo-tab="url" aria-selected="false">Image URL</button>
+              </div>
+              <div data-photo-pane="upload">
+                <label class="dropzone" id="dropzone">
+                  <input type="file" id="fFile" accept="image/*" class="visually-hidden">
+                  <i data-lucide="image-plus"></i>
+                  <strong>Drop a photo or <u>browse</u></strong>
+                  <small>JPG, PNG or WebP — resized automatically</small>
+                </label>
+              </div>
+              <div data-photo-pane="url" hidden>
+                <input id="fUrl" class="input" type="url" placeholder="https://…" inputmode="url" autocomplete="off">
+                <p class="hint">Paste a direct link to an image file.</p>
+              </div>
+              <button type="button" class="link-btn link-btn--danger" id="photoClear" hidden><i data-lucide="x"></i>Remove photo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="modal__foot">
+        <button type="button" class="btn btn--ghost" data-close>Cancel</button>
+        <button type="submit" class="btn btn--primary" id="formSubmit"><i data-lucide="check"></i><span>Add to collection</span></button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- ─── Detail / preview modal ───────────────────────────── -->
+  <dialog class="modal modal--detail" id="detailModal" aria-label="Model details">
+    <div class="modal__card" id="detailCard"></div>
+  </dialog>
+
+  <!-- ─── Confirm dialog ───────────────────────────────────── -->
+  <dialog class="modal modal--confirm" id="confirmModal" aria-labelledby="confirmTitle">
+    <div class="modal__card">
+      <div class="confirm__icon" id="confirmIcon"></div>
+      <h2 id="confirmTitle"></h2>
+      <p id="confirmBody"></p>
+      <div class="confirm__actions" id="confirmActions"></div>
+    </div>
+  </dialog>
+
+  <div class="toasts" id="toasts" popover="manual" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/seed.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/io.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
