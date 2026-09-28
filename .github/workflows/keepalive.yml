@@ -1,0 +1,25 @@
+# Pings the Supabase database every 3 days so the free project is never paused for inactivity.
+# Reads the project URL and public key from js/config.js — nothing to set up.
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: '17 6 */3 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ping database
+        run: |
+          read -r URL KEY < <(node -e "
+            global.window = globalThis;
+            require('./js/config.js');
+            const c = window.DV.config;
+            console.log(c.SUPABASE_URL, c.SUPABASE_KEY);
+          ")
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "Sync not configured yet — skipping."; exit 0; fi
+          curl --fail --silent --show-error -X POST "$URL/rest/v1/rpc/keepalive" \
+            -H "apikey: $KEY" -H "Content-Type: application/json" -d '{}'

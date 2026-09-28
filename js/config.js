@@ -9,6 +9,12 @@ DV.config = Object.freeze({
   MIN_IMAGE_EDGE: 480,           // never shrink below this to hit the size budget
   MAX_IMAGE_BYTES: 120 * 1024,   // target size per stored photo
 
+  // Cloud sync (Supabase → Project Settings → API). Both values are meant to be public:
+  // your data is protected by the row-level security rules in supabase/setup.sql.
+  // Leave empty to keep the app local-only.
+  SUPABASE_URL: 'https://ymtdqigbxrahuxunjxis.supabase.co',
+  SUPABASE_KEY: 'sb_publishable_Zf6xzyUSmTOf9vxnD9xi8Q_BDESkKUR',
+
   DIECAST_BRANDS: [
     'Hot Wheels', 'Matchbox', 'Maisto', 'Bburago', 'Welly', 'Mini GT', 'Kaido House',
     'Inno64', 'Tomica', 'Autoart', 'Kyosho', 'Greenlight', 'Johnny Lightning',

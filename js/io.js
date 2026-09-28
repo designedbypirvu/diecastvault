@@ -25,6 +25,36 @@ DV.io = (() => {
     download('diecast_collection.json', JSON.stringify(payload, null, 2), 'application/json');
   }
 
+  const blobToDataURL = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+
+  /**
+   * Swaps cloud-hosted photos for inline copies so a JSON backup stands on its own.
+   * @returns {Promise<{ items: Array, failed: number }>}
+   */
+  async function inlinePhotos(items, isHosted) {
+    const out = [...items];
+    const todo = out.map((it, i) => i).filter((i) => isHosted(out[i].image));
+    let failed = 0;
+    const worker = async () => {
+      for (let i = todo.shift(); i !== undefined; i = todo.shift()) {
+        try {
+          const res = await fetch(out[i].image);
+          if (!res.ok) throw new Error(res.statusText);
+          out[i] = { ...out[i], image: await blobToDataURL(await res.blob()) };
+        } catch {
+          failed++; // keep the link rather than lose the photo
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: 6 }, worker));
+    return { items: out, failed };
+  }
+
   // Quote every cell and neutralise spreadsheet formula injection (=, +, -, @).
   const csvCell = (value) => {
     let s = value == null ? '' : String(value);
@@ -154,5 +184,5 @@ DV.io = (() => {
     }
   }
 
-  return { exportJSON, exportCSV, parseImport, readText, imageToDataURL, shrinkDataURL, dataURLBytes };
+  return { exportJSON, inlinePhotos, exportCSV, parseImport, readText, imageToDataURL, shrinkDataURL, dataURLBytes };
 })();

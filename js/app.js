@@ -83,23 +83,45 @@
     detailModal: $('#detailModal'),
     detailCard: $('#detailCard'),
     confirmModal: $('#confirmModal'),
+    accountMenu: $('#accountMenu'),
+    accountBtn: $('#accountBtn'),
   };
 
   /* ─── Persistence ──────────────────────────────────────────── */
+  // Local edits and incoming cloud changes take turns, so neither overwrites the other.
+  let committing = 0;
+  let idleWaiters = [];
+  const whenIdle = () => new Promise((resolve) => (committing ? idleWaiters.push(resolve) : resolve()));
+
   /** Saves and applies a new item list. Resolves false (and changes nothing) if the browser is out of space. */
   async function commit(next) {
-    const result = await store.save(next);
-    if (result === 'quota') {
-      toast('Browser storage is full. Export a backup and remove some models, or free up space on this device.', { type: 'error' });
-      return false;
+    committing++;
+    try {
+      const result = await store.save(next);
+      if (result === 'quota') {
+        toast('Browser storage is full. Export a backup and remove some models, or free up space on this device.', { type: 'error' });
+        return false;
+      }
+      if (result === 'unavailable' && !storageWarned) {
+        storageWarned = true;
+        toast('Storage is blocked in this browser — changes will be lost when you close the tab.', { type: 'error' });
+      }
+      state.items = next;
+      renderAll();
+      return true;
+    } finally {
+      if (!--committing) { idleWaiters.forEach((r) => r()); idleWaiters = []; }
     }
-    if (result === 'unavailable' && !storageWarned) {
-      storageWarned = true;
-      toast('Storage is blocked in this browser — changes will be lost when you close the tab.', { type: 'error' });
-    }
+  }
+
+  /** Applies a change from the sync layer to the latest list; update(items) returns null for "no change". */
+  async function applyRemote(update) {
+    while (committing) await whenIdle();
+    const next = update(state.items);
+    if (!next) return;
     state.items = next;
     renderAll();
-    return true;
+    await store.save(next, { remote: true });
   }
 
   const savePrefs = () => store.savePrefs({ sort: state.sort, view: state.view });
@@ -661,8 +683,9 @@
     $('#fShelfField').hidden = form.wishlist; // you can't shelve a car you don't own yet
 
     const img = item?.image ?? '';
-    form.url.value = img && !img.startsWith('data:') ? img : '';
-    setPhoto(img, { tab: img && !img.startsWith('data:') ? 'url' : 'upload' });
+    const pasted = Boolean(img) && !img.startsWith('data:') && !DV.sync.isHostedPhoto(img); // a link typed in, not an upload
+    form.url.value = pasted ? img : '';
+    setPhoto(img, { tab: pasted ? 'url' : 'upload' });
 
     $('#formEyebrow').textContent = item ? (form.wishlist ? 'Edit wish' : 'Edit entry') : (form.wishlist ? 'New wish' : 'New entry');
     $('#formTitle').textContent = item ? `${item.carBrand} ${item.model}` : (form.wishlist ? 'Add to wishlist' : 'Add a model');
@@ -977,12 +1000,72 @@
     }
   }
 
-  function exportAs(kind) {
+  async function exportAs(kind) {
     if (!state.items.length) { toast('Nothing to export yet — add a model first.', { type: 'info' }); return; }
-    const list = [...state.items].sort((a, b) => b.createdAt - a.createdAt);
-    if (kind === 'json') io.exportJSON(list);
-    else io.exportCSV(list);
-    toast(`Exported ${list.length} models as ${kind.toUpperCase()}.`);
+    let list = [...state.items].sort((a, b) => b.createdAt - a.createdAt);
+    if (kind === 'csv') {
+      io.exportCSV(list);
+      toast(`Exported ${list.length} models as CSV.`);
+      return;
+    }
+    const hosted = list.filter((it) => DV.sync.isHostedPhoto(it.image)).length;
+    let failed = 0;
+    if (hosted) {
+      toast(`Preparing backup — downloading ${hosted} photo${hosted === 1 ? '' : 's'}…`, { type: 'info', duration: 3000 });
+      ({ items: list, failed } = await io.inlinePhotos(list, DV.sync.isHostedPhoto));
+    }
+    io.exportJSON(list);
+    if (failed) toast(`Exported ${list.length} models, but ${failed} photo${failed === 1 ? '' : 's'} couldn’t be downloaded — those are saved as links.`, { type: 'error' });
+    else toast(`Exported ${list.length} models as JSON.`);
+  }
+
+  /* ─── Account & sync status ────────────────────────────────── */
+  function setAccountMenu(open) {
+    els.accountMenu.classList.toggle('is-open', open);
+    els.accountBtn.setAttribute('aria-expanded', String(open));
+    if (open) $('[role="menuitem"]', els.accountMenu).focus();
+  }
+
+  const ago = (t) => {
+    const s = Math.round((Date.now() - t) / 1000);
+    if (s < 45) return 'just now';
+    if (s < 3600) return `${Math.round(s / 60)} min ago`;
+    return fmtDate(t);
+  };
+
+  function syncStatusText(s) {
+    const waiting = s.pending ? `${s.pending} change${s.pending === 1 ? '' : 's'} waiting` : '';
+    if (s.state === 'syncing') return s.progress || 'Syncing…';
+    if (s.state === 'offline') return `Offline${waiting ? ` — ${waiting}` : ''}`;
+    if (s.state === 'error') return `Couldn’t sync — retrying${waiting ? ` (${waiting})` : ''}`;
+    if (waiting) return waiting;
+    return s.lastSynced ? `Synced ${ago(s.lastSynced)}` : 'Synced';
+  }
+
+  let accountKey = null; // which account the avatar was last drawn for
+  function renderAccount(s) {
+    els.accountMenu.hidden = s.state === 'disabled';
+    if (s.state === 'disabled') return;
+    const signedIn = Boolean(s.user);
+    const avatar = $('#accountAvatar');
+    els.accountMenu.dataset.sync = s.state;
+    els.accountBtn.setAttribute('aria-haspopup', signedIn ? 'menu' : 'false');
+    els.accountBtn.title = signedIn ? syncStatusText(s) : 'Sign in with Google to sync your devices';
+    $('#accountStatus').textContent = syncStatusText(s);
+    if (!signedIn) setAccountMenu(false);
+
+    if ((s.user?.id ?? '') === accountKey) return; // only rebuild the avatar when the account changes
+    accountKey = s.user?.id ?? '';
+    const meta = s.user?.user_metadata || {};
+    const name = meta.full_name || meta.name || s.user?.email || '';
+    $('#accountLabel').textContent = signedIn ? (name.split(' ')[0] || 'Account') : 'Sign in';
+    $('#accountName').textContent = name;
+    $('#accountEmail').textContent = s.user?.email || '';
+    avatar.innerHTML = !signedIn ? '<i data-lucide="log-in"></i>'
+      : meta.avatar_url ? `<img src="${esc(meta.avatar_url)}" alt="" referrerpolicy="no-referrer">`
+      : `<span>${esc(initials(name) || '?')}</span>`;
+    hydrateIcons(avatar);
+    if (s.welcome) toast(`Signed in as ${name} — syncing your collection.`, { type: 'info' });
   }
 
   function setExportMenu(open) {
@@ -1038,6 +1121,20 @@
       exportAs(item.dataset.export);
     });
     document.addEventListener('click', (e) => { if (!els.exportMenu.contains(e.target)) setExportMenu(false); });
+
+    els.accountBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!DV.sync.status().user) DV.sync.signIn();
+      else setAccountMenu(!els.accountMenu.classList.contains('is-open'));
+    });
+    els.accountMenu.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-account]');
+      if (!item) return;
+      setAccountMenu(false);
+      if (item.dataset.account === 'sync') DV.sync.syncNow();
+      else DV.sync.signOut().then(() => toast('Signed out. This device keeps its copy of your collection.', { type: 'info' }));
+    });
+    document.addEventListener('click', (e) => { if (!els.accountMenu.contains(e.target)) setAccountMenu(false); });
 
     // Collection / wishlist
     els.tabs.addEventListener('click', (e) => {
@@ -1175,6 +1272,7 @@
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && els.exportMenu.classList.contains('is-open')) { setExportMenu(false); els.exportBtn.focus(); return; }
+      if (e.key === 'Escape' && els.accountMenu.classList.contains('is-open')) { setAccountMenu(false); els.accountBtn.focus(); return; }
       const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
       if (typing || $('dialog[open]') || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === '/') { e.preventDefault(); els.search.focus(); els.search.select(); }
@@ -1220,6 +1318,7 @@
     }
     if (items === null) {
       items = DV.seed();
+      DV.sync.rememberDemo(items);
       store.save(items);
     }
     state.items = items;
@@ -1233,6 +1332,7 @@
     renderAll();
     requestAnimationFrame(() => document.body.classList.add('is-ready'));
     compactPhotos();
+    DV.sync.init({ getItems: () => state.items, apply: applyRemote, ask, toast, onStatus: renderAccount });
   }
 
   init();

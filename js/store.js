@@ -68,8 +68,9 @@ DV.store = (() => {
 
   let backend = 'idb';        // 'idb' | 'local'
   let db = null;
-  let persisted = new Map();  // id -> item object last written, so saves only touch what changed
+  let persisted = new Map();  // id -> item object last written, so saves only touch (and sync) what changed
   let queue = Promise.resolve();
+  const writeListeners = [];
   const channel = 'BroadcastChannel' in window ? new BroadcastChannel(DB_NAME) : null;
 
   const done = (req) => new Promise((resolve, reject) => {
@@ -117,12 +118,21 @@ DV.store = (() => {
     }
   }
 
-  async function writeIDB(items) {
+  /** Ids added or edited, and ids removed, compared with the last save. */
+  function diff(items) {
     const next = new Map(items.map((it) => [it.id, it]));
+    const changed = [];
+    next.forEach((it, id) => { if (persisted.get(id) !== it) changed.push(id); });
+    const removed = [...persisted.keys()].filter((id) => !next.has(id));
+    return { next, changed, removed };
+  }
+
+  async function writeIDB(items) {
+    const { next, changed, removed } = diff(items);
     const tx = db.transaction([ITEMS, META], 'readwrite');
     const os = tx.objectStore(ITEMS);
-    next.forEach((it, id) => { if (persisted.get(id) !== it) os.put(it); });
-    persisted.forEach((_, id) => { if (!next.has(id)) os.delete(id); });
+    changed.forEach((id) => os.put(next.get(id)));
+    removed.forEach((id) => os.delete(id));
     tx.objectStore(META).put(true, 'initialized');
     await finished(tx);
     persisted = next;
@@ -138,7 +148,11 @@ DV.store = (() => {
         backend = 'local';
       }
     }
-    if (backend === 'local') return loadLocal();
+    if (backend === 'local') {
+      const items = loadLocal();
+      persisted = new Map((items || []).map((it) => [it.id, it]));
+      return items;
+    }
 
     const tx = db.transaction([ITEMS, META], 'readonly');
     const [rows, initialized] = await Promise.all([
@@ -165,17 +179,34 @@ DV.store = (() => {
     return items;
   }
 
-  /** Writes are queued so they land in order. @returns {Promise<'ok'|'quota'|'unavailable'>} */
-  function save(items) {
+  async function write(items) {
+    if (backend === 'local') {
+      const result = saveLocal(items);
+      if (result === 'ok') persisted = diff(items).next;
+      return result;
+    }
+    try {
+      await writeIDB(items);
+      channel?.postMessage('changed');
+      return 'ok';
+    } catch (err) {
+      return isQuota(err) ? 'quota' : 'unavailable';
+    }
+  }
+
+  /**
+   * Writes are queued so they land in order. Pass { remote: true } for changes that came from the
+   * cloud, so they aren't reported back to the sync layer as local edits.
+   * @returns {Promise<'ok'|'quota'|'unavailable'>}
+   */
+  function save(items, { remote = false } = {}) {
     const run = queue.then(async () => {
-      if (backend === 'local') return saveLocal(items);
-      try {
-        await writeIDB(items);
-        channel?.postMessage('changed');
-        return 'ok';
-      } catch (err) {
-        return isQuota(err) ? 'quota' : 'unavailable';
+      const { changed, removed } = diff(items);
+      const result = await write(items);
+      if (!remote && result !== 'quota' && (changed.length || removed.length)) {
+        writeListeners.forEach((cb) => cb({ changed, removed }));
       }
+      return result;
     });
     queue = run.catch(() => {});
     return run;
@@ -185,6 +216,11 @@ DV.store = (() => {
   function onExternalChange(callback) {
     channel?.addEventListener('message', callback);
     window.addEventListener('storage', (e) => { if (backend === 'local' && e.key === STORAGE_KEY) callback(); });
+  }
+
+  /** Calls back with { changed, removed } ids after every local edit is saved. */
+  function onLocalWrite(callback) {
+    writeListeners.push(callback);
   }
 
   function loadPrefs() {
@@ -203,5 +239,5 @@ DV.store = (() => {
     }
   }
 
-  return { uid, normalize, isSafeImage, load, save, onExternalChange, loadPrefs, savePrefs };
+  return { uid, normalize, isSafeImage, load, save, onExternalChange, onLocalWrite, loadPrefs, savePrefs };
 })();

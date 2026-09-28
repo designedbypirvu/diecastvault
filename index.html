@@ -57,6 +57,27 @@
         <button class="btn btn--primary" id="addBtn" type="button">
           <i data-lucide="plus"></i><span class="btn__label">Add model</span>
         </button>
+
+        <div class="menu account" id="accountMenu" hidden>
+          <button class="btn btn--ghost account__btn" id="accountBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="accountPanel">
+            <span class="account__avatar" id="accountAvatar"></span><span class="btn__label" id="accountLabel">Sign in</span>
+          </button>
+          <div class="menu__panel account__panel" id="accountPanel" role="menu">
+            <div class="account__head">
+              <strong id="accountName"></strong>
+              <small id="accountEmail"></small>
+            </div>
+            <p class="account__status" id="accountStatus" aria-live="polite"></p>
+            <button type="button" role="menuitem" data-account="sync">
+              <span class="menu__icon"><i data-lucide="refresh-cw"></i></span>
+              <span><strong>Sync now</strong><small>Fetch changes from your other devices</small></span>
+            </button>
+            <button type="button" role="menuitem" data-account="signout">
+              <span class="menu__icon"><i data-lucide="log-out"></i></span>
+              <span><strong>Sign out</strong><small>This device keeps its copy</small></span>
+            </button>
+          </div>
+        </div>
         <input type="file" id="importInput" accept="application/json,.json" hidden>
       </nav>
     </div>
@@ -279,6 +300,8 @@
   <script src="js/seed.js"></script>
   <script src="js/store.js"></script>
   <script src="js/io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js"></script>
+  <script src="js/sync.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

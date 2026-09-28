@@ -348,6 +348,47 @@ kbd {
   color: var(--accent);
 }
 
+/* Account / sync menu: avatar with a status dot (green synced, cyan syncing, gold waiting, red problem) */
+.account__btn { gap: 9px; }
+.account__avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--text);
+  font: 600 11px/1 var(--font-display);
+}
+.account__avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.account__avatar .icon { width: 18px; height: 18px; }
+.account[data-sync='signed-out'] .account__avatar { width: 18px; background: none; }
+.account__avatar::after {
+  content: '';
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--faint);
+  opacity: 0;
+  transition: background 0.3s, opacity 0.3s;
+}
+.account[data-sync='synced'] .account__avatar::after { opacity: 1; background: #34D399; }
+.account[data-sync='syncing'] .account__avatar::after { opacity: 1; background: var(--accent); animation: account-pulse 1.2s ease-in-out infinite; }
+.account[data-sync='offline'] .account__avatar::after { opacity: 1; background: var(--gold); }
+.account[data-sync='error'] .account__avatar::after { opacity: 1; background: var(--crimson); }
+@keyframes account-pulse { 50% { opacity: 0.35; } }
+.account__head { padding: 10px 10px 4px; }
+.account__head strong, .account__head small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account__status { margin: 0 10px 8px; padding-bottom: 10px; border-bottom: 1px solid var(--border); color: var(--text-2); font-size: 12.5px; }
+.account[data-sync='error'] .account__status { color: #FF6B61; }
+.account[data-sync='offline'] .account__status { color: var(--gold); }
+
 /* 4. Hero & stats -------------------------------------------------------- */
 .hero {
   position: relative;
