@@ -44,6 +44,7 @@ DV.seed = (() => {
         condition,
         shelved: false,
         wishlist: false,
+        chase: false,
         image: photo(photoId),
         createdAt,
         updatedAt: createdAt,
