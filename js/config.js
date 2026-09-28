@@ -37,5 +37,6 @@ DV.config = Object.freeze({
     { value: 'oldest', label: 'Oldest added' },
     { value: 'car', label: 'Car brand A–Z' },
     { value: 'model', label: 'Model name A–Z' },
+    { value: 'year', label: 'Model year' },
   ],
 });

@@ -166,10 +166,18 @@
           <p class="field__error" role="alert"></p>
         </div>
 
-        <div class="field field--full" data-field="model">
-          <label for="fModel">Car model <span class="req">*</span></label>
-          <input id="fModel" class="input" type="text" placeholder="e.g. 911 GT3 RS, F40, Skyline GT-R R34" maxlength="90" autocomplete="off">
-          <p class="field__error" role="alert"></p>
+        <div class="field-row field--full">
+          <div class="field" data-field="model">
+            <label for="fModel">Car model <span class="req">*</span></label>
+            <input id="fModel" class="input" type="text" placeholder="e.g. 911 GT3 RS, F40, Skyline GT-R R34" maxlength="90" autocomplete="off">
+            <p class="field__error" role="alert"></p>
+          </div>
+
+          <div class="field" data-field="year">
+            <label for="fYear">Year <span class="opt">optional</span></label>
+            <input id="fYear" class="input" type="text" placeholder="e.g. 1997" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+            <p class="field__error" role="alert"></p>
+          </div>
         </div>
 
         <div class="field" data-field="scale">

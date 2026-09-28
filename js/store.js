@@ -20,6 +20,12 @@ DV.store = (() => {
     return CONDITIONS[1].value;
   }
 
+  /** Model year as a 4-digit string ('' when missing or implausible). */
+  function normalizeYear(value) {
+    const m = str(value).match(/\b(18|19|20)\d{2}\b/);
+    return m ? m[0] : '';
+  }
+
   function toTime(v, fallback) {
     const n = typeof v === 'number' ? v : Date.parse(v);
     return Number.isFinite(n) && n > 0 ? n : fallback;
@@ -36,6 +42,7 @@ DV.store = (() => {
       diecastBrand: str(raw.diecastBrand),
       carBrand: str(raw.carBrand),
       model: str(raw.model),
+      year: normalizeYear(raw.year),
       scale: str(raw.scale) || '1:64',
       series: str(raw.series),
       condition: normalizeCondition(raw.condition),

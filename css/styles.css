@@ -900,6 +900,7 @@ select option, select optgroup { background: var(--surface); color: var(--text);
   overflow: hidden;
 }
 .card__make { color: var(--muted); font-weight: 500; }
+.card__year { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
 .card__meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; }
 .card__series { min-width: 0; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -1059,6 +1060,8 @@ dialog.modal.is-closing::backdrop { animation: fadeOut 0.2s var(--ease) both; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 18px; align-content: start; }
 .field { display: flex; flex-direction: column; min-width: 0; margin: 0; padding: 0; border: 0; }
 .field--full { grid-column: 1 / -1; }
+/* Model + year share one row: the year only needs room for 4 digits */
+.field-row { display: grid; grid-template-columns: minmax(0, 1fr) 118px; gap: 18px; }
 .field > label, .field > legend, .field > .label {
   display: block;
   margin-bottom: 8px;

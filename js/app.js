@@ -143,7 +143,7 @@
       if (state.shelf && it.shelved !== (state.shelf === 'on')) return false;
       if (state.chase && !it.chase) return false;
       if (!terms.length) return true;
-      const hay = fold(`${it.diecastBrand} ${it.carBrand} ${it.model} ${it.series}`);
+      const hay = fold(`${it.diecastBrand} ${it.carBrand} ${it.model} ${it.year} ${it.series}`);
       return terms.every((t) => hay.includes(t));
     });
     const sorters = {
@@ -151,6 +151,8 @@
       oldest: (a, b) => a.createdAt - b.createdAt,
       car: (a, b) => byText(a.carBrand, b.carBrand) || byText(a.model, b.model),
       model: (a, b) => byText(a.model, b.model) || byText(a.carBrand, b.carBrand),
+      // oldest model year first; cars without a year go last
+      year: (a, b) => (a.year || '9999').localeCompare(b.year || '9999') || byText(a.carBrand, b.carBrand) || byText(a.model, b.model),
     };
     return list.sort(sorters[state.sort]);
   }
@@ -296,7 +298,7 @@
     el.tabIndex = 0;
     el.dataset.id = item.id;
     el.dataset.sig = cardSig(item);
-    el.setAttribute('aria-label', `${item.diecastBrand} ${item.carBrand} ${item.model}, ${item.scale}`);
+    el.setAttribute('aria-label', `${item.diecastBrand} ${item.carBrand} ${item.model}${item.year ? ` (${item.year})` : ''}, ${item.scale}`);
     el.innerHTML = `
       <div class="card__media media" data-media>
         ${mediaHTML(item)}
@@ -309,7 +311,7 @@
         </div>
       </div>
       <div class="card__body">
-        <h3 class="card__title"><span class="card__make">${esc(item.carBrand)}</span> ${esc(item.model)}</h3>
+        <h3 class="card__title"><span class="card__make">${esc(item.carBrand)}</span> ${esc(item.model)}${item.year ? ` <span class="card__year">${esc(item.year)}</span>` : ''}</h3>
         <div class="card__inline-actions">
           ${item.wishlist ? `<button type="button" class="icon-btn card__btn icon-btn--got" data-action="acquire" aria-label="Got ${esc(item.model)} — move to collection" title="Got it — move to collection"><i data-lucide="package-plus"></i></button>` : ''}
           <button type="button" class="icon-btn card__btn" data-action="edit" aria-label="Edit ${esc(item.model)}" title="Edit"><i data-lucide="pencil"></i></button>
@@ -562,6 +564,7 @@
     car: $('#fCar'),
     carCustom: $('#fCarCustom'),
     model: $('#fModel'),
+    year: $('#fYear'),
     scale: $('#fScale'),
     scaleCustom: $('#fScaleCustom'),
     series: $('#fSeries'),
@@ -647,6 +650,7 @@
     setChoice(form.car, form.carCustom, item?.carBrand ?? '');
     setChoice(form.scale, form.scaleCustom, item?.scale ?? '1:64');
     form.model.value = item?.model ?? '';
+    form.year.value = item?.year ?? '';
     setChoice(form.series, form.seriesCustom, item?.series ?? '');
     if (item) {
       const radio = $$('input[name="condition"]', form.conditions).find((r) => r.value === item.condition);
@@ -679,6 +683,7 @@
       diecastBrand: readChoice(form.diecast, form.diecastCustom),
       carBrand: readChoice(form.car, form.carCustom),
       model: form.model.value.trim(),
+      year: form.year.value.trim(),
       scale: readChoice(form.scale, form.scaleCustom),
       series: readChoice(form.series, form.seriesCustom),
       condition: $('input[name="condition"]:checked', form.conditions)?.value ?? 'Loose',
@@ -692,6 +697,7 @@
     if (!data.diecastBrand) errors.push(['diecastBrand', form.diecast.value === C.CUSTOM ? 'Enter the manufacturer name.' : 'Choose a diecast manufacturer.']);
     if (!data.carBrand) errors.push(['carBrand', form.car.value === C.CUSTOM ? 'Enter the car brand.' : 'Choose a car brand.']);
     if (!data.model) errors.push(['model', 'Enter the model name.']);
+    if (data.year && !(/^\d{4}$/.test(data.year) && data.year >= 1885 && data.year <= new Date().getFullYear() + 2)) errors.push(['year', 'Enter a 4-digit year, e.g. 1997.']);
     if (!data.scale) errors.push(['scale', 'Enter the scale, e.g. 1:87.']);
     if (errors.length) {
       errors.forEach(([k, m]) => setError(k, m));
@@ -752,6 +758,7 @@
       ['Diecast brand', item.diecastBrand, 'factory'],
       ['Car brand', item.carBrand, 'car-front'],
       ['Model', item.model, 'tag'],
+      ['Year', item.year || '—', 'calendar'],
       ['Scale', item.scale, 'ruler'],
       ['Series', item.series || '—', 'layers'],
       ['Condition', cond.value, cond.icon],
@@ -785,7 +792,7 @@
         <header class="modal__head">
           <div>
             <p class="eyebrow">${item.wishlist ? 'Wishlist · ' : ''}${esc(item.scale)} · ${esc(item.diecastBrand)}</p>
-            <h2><span class="card__make">${esc(item.carBrand)}</span> ${esc(item.model)}</h2>
+            <h2><span class="card__make">${esc(item.carBrand)}</span> ${esc(item.model)}${item.year ? ` <span class="card__year">${esc(item.year)}</span>` : ''}</h2>
           </div>
           <button type="button" class="icon-btn" data-close aria-label="Close"><i data-lucide="x"></i></button>
         </header>
