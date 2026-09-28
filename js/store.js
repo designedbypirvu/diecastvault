@@ -49,6 +49,7 @@ DV.store = (() => {
       shelved: !wishlist && (raw.shelved === true || /^(true|yes|1)$/i.test(str(raw.shelved))),
       wishlist,               // true = wanted, not owned yet
       chase: raw.chase === true || /^(true|yes|1)$/i.test(str(raw.chase)), // Treasure Hunt / Chase variant
+      duplicate: raw.duplicate === true || /^(true|yes|1)$/i.test(str(raw.duplicate)), // a spare copy, marked by hand
       image: isSafeImage(image) ? image : '',
       createdAt: toTime(raw.createdAt, now),
       updatedAt: 0,

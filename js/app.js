@@ -48,6 +48,7 @@
     car: '',
     shelf: '',               // '' | 'on' | 'off'
     chase: false,            // only TH / Chase models
+    dupes: false,            // only models marked as duplicates
     sort: C.SORTS.some((s) => s.value === prefs.sort) ? prefs.sort : 'newest',
     view: prefs.view === 'list' ? 'list' : 'grid',
   };
@@ -163,6 +164,7 @@
       if (state.car && it.carBrand !== state.car) return false;
       if (state.shelf && it.shelved !== (state.shelf === 'on')) return false;
       if (state.chase && !it.chase) return false;
+      if (state.dupes && !it.duplicate) return false;
       if (!terms.length) return true;
       const hay = fold(`${it.diecastBrand} ${it.carBrand} ${it.model} ${it.year} ${it.series}`);
       return terms.every((t) => hay.includes(t));
@@ -178,7 +180,7 @@
     return list.sort(sorters[state.sort]);
   }
 
-  const hasFilters = () => Boolean(state.search.trim() || state.diecast || state.car || state.shelf || state.chase);
+  const hasFilters = () => Boolean(state.search.trim() || state.diecast || state.car || state.shelf || state.chase || state.dupes);
 
   /* ─── Rendering: stats ─────────────────────────────────────── */
   function renderStats() {
@@ -270,13 +272,14 @@
         { type: 'shelf', value: 'off', label: 'Not shelved', count: items.filter((i) => !i.shelved).length },
       ]),
       ...(items.some((i) => i.chase) ? [{ type: 'chase', value: 'on', label: 'TH / Chase', count: items.filter((i) => i.chase).length }] : []),
+      ...(items.some((i) => i.duplicate) ? [{ type: 'dupes', value: 'on', label: 'Duplicates', count: items.filter((i) => i.duplicate).length }] : []),
       ...countBy(items, 'diecastBrand').slice(0, 2).map(([v, n]) => ({ type: 'diecast', value: v, label: v, count: n })),
       ...countBy(items, 'carBrand').slice(0, 5).map(([v, n]) => ({ type: 'car', value: v, label: v, count: n })),
     ];
     els.chips.hidden = items.length === 0;
     els.chips.innerHTML = chips.map((c) => `
       <button type="button" class="chip chip--${c.type}" data-chip-type="${c.type}" data-chip-value="${esc(c.value ?? '')}" aria-pressed="false">
-        ${c.type === 'diecast' ? '<i data-lucide="factory"></i>' : c.type === 'chase' ? '<i data-lucide="flame"></i>' : c.value === 'on' ? '<i data-lucide="library"></i>' : ''}${esc(c.label)}<span class="chip__count">${c.count}</span>
+        ${c.type === 'diecast' ? '<i data-lucide="factory"></i>' : c.type === 'chase' ? '<i data-lucide="flame"></i>' : c.type === 'dupes' ? '<i data-lucide="copy"></i>' : c.value === 'on' ? '<i data-lucide="library"></i>' : ''}${esc(c.label)}<span class="chip__count">${c.count}</span>
       </button>`).join('');
     hydrateIcons(els.chips);
     syncChipState();
@@ -285,9 +288,10 @@
   function syncChipState() {
     $$('.chip', els.chips).forEach((chip) => {
       const { chipType: type, chipValue: value } = chip.dataset;
-      const active = type === 'all' ? !state.diecast && !state.car && !state.shelf && !state.chase
+      const active = type === 'all' ? !state.diecast && !state.car && !state.shelf && !state.chase && !state.dupes
         : type === 'shelf' ? state.shelf === value
         : type === 'chase' ? state.chase
+        : type === 'dupes' ? state.dupes
         : type === 'diecast' ? state.diecast === value
         : state.car === value;
       chip.classList.toggle('is-active', active);
@@ -344,6 +348,7 @@
             <span class="pill pill--brand">${esc(item.diecastBrand)}</span>
             <span class="pill pill--scale${item.scale === C.SCALES[0] ? ' is-default' : ''}">${esc(item.scale)}</span>
             ${item.chase ? '<span class="pill pill--chase" title="Treasure Hunt / Chase"><i data-lucide="flame"></i>TH</span>' : ''}
+            ${item.duplicate ? '<span class="pill pill--dupe" title="Duplicate"><i data-lucide="copy"></i>Dupe</span>' : ''}
             ${item.shelved ? '<span class="pill pill--shelf" title="On the display shelf"><i data-lucide="library"></i>On shelf</span>' : ''}
             ${conditionPill(item.condition)}
           </span>
@@ -679,6 +684,7 @@
     }
     $(`input[name="shelved"][value="${item?.shelved ? 'yes' : 'no'}"]`, els.form).checked = true;
     $('#fChase', els.form).checked = Boolean(item?.chase);
+    $('#fDuplicate', els.form).checked = Boolean(item?.duplicate);
     $('#fShelfField').hidden = form.wishlist; // you can't shelve a car you don't own yet
 
     const img = item?.image ?? '';
@@ -712,6 +718,7 @@
       shelved: !form.wishlist && $('input[name="shelved"]:checked', els.form)?.value === 'yes',
       wishlist: form.wishlist,
       chase: $('#fChase', els.form).checked,
+      duplicate: $('#fDuplicate', els.form).checked,
       image: form.photo,
     };
 
@@ -784,7 +791,7 @@
       ['Scale', item.scale, 'ruler'],
       ['Series', item.series || '—', 'layers'],
       ['Condition', cond.value, cond.icon],
-      ...(item.chase ? [['Special', 'TH / Chase', 'flame']] : []),
+      ...(item.chase || item.duplicate ? [['Special', [item.chase && 'TH / Chase', item.duplicate && 'Duplicate'].filter(Boolean).join(' · '), item.chase ? 'flame' : 'copy']] : []),
       [item.wishlist ? 'Wishlisted' : 'Added', fmtDate(item.createdAt), 'calendar-days'],
     ];
     const shelfRow = item.wishlist ? '' : `
@@ -1092,7 +1099,7 @@
 
   function clearFilters() {
     els.search.value = '';
-    setFilter({ search: '', diecast: '', car: '', shelf: '', chase: false });
+    setFilter({ search: '', diecast: '', car: '', shelf: '', chase: false, dupes: false });
   }
 
   /** Switches between the owned collection and the wishlist; filters start fresh on each side. */
@@ -1100,7 +1107,7 @@
     if (section === state.section) return;
     state.section = section;
     els.search.value = '';
-    Object.assign(state, { search: '', diecast: '', car: '', shelf: '', chase: false });
+    Object.assign(state, { search: '', diecast: '', car: '', shelf: '', chase: false, dupes: false });
     renderTabs();
     renderFilterOptions();
     renderChips();
@@ -1171,8 +1178,9 @@
       const chip = e.target.closest('.chip');
       if (!chip) return;
       const { chipType: type, chipValue: value } = chip.dataset;
-      if (type === 'all') setFilter({ diecast: '', car: '', shelf: '', chase: false });
+      if (type === 'all') setFilter({ diecast: '', car: '', shelf: '', chase: false, dupes: false });
       else if (type === 'chase') setFilter({ chase: !state.chase });
+      else if (type === 'dupes') setFilter({ dupes: !state.dupes });
       else if (type === 'shelf') setFilter({ shelf: state.shelf === value ? '' : value });
       else if (type === 'diecast') setFilter({ diecast: state.diecast === value ? '' : value });
       else setFilter({ car: state.car === value ? '' : value });

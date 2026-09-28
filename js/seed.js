@@ -45,6 +45,7 @@ DV.seed = (() => {
         shelved: false,
         wishlist: false,
         chase: false,
+        duplicate: false,
         year: '',
         image: photo(photoId),
         createdAt,
