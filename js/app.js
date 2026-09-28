@@ -95,6 +95,7 @@
   async function commit(next) {
     committing++;
     try {
+      next = store.stamp(state.items, next);
       const result = await store.save(next);
       if (result === 'quota') {
         toast('Browser storage is full. Export a backup and remove some models, or free up space on this device.', { type: 'error' });
@@ -904,11 +905,13 @@
     if (!count) return;
     const plural = `${count} model${count === 1 ? '' : 's'}`;
     const restore = () => { if (!state.items.some((i) => Boolean(i.wishlist) === wish)) commit([...items, ...state.items]); };
+    const synced = Boolean(DV.sync.status().user);
+    const where = synced ? 'this device and all your signed-in devices' : 'this device';
 
     if (wish) {
       const choice = await ask({
         title: 'Clear your wishlist?',
-        body: `All ${plural} on your wishlist will be removed. Your collection isn’t affected.`,
+        body: `All ${plural} on your wishlist will be removed from ${where}. Your collection isn’t affected.`,
         icon: 'trash-2',
         actions: [{ label: 'Cancel', value: null }, { label: 'Clear wishlist', value: 'delete', variant: 'danger' }],
       });
@@ -920,7 +923,7 @@
 
     const first = await ask({
       title: `Delete all ${plural}?`,
-      body: 'Every model and photo in your vault will be removed from this device. Download a backup first if you might want them back.',
+      body: `Every model and photo in your vault will be removed from ${where}. Download a backup first if you might want them back.`,
       icon: 'trash-2',
       actions: [{ label: 'Cancel', value: null }, { label: 'Download backup', value: 'backup' }, { label: 'Continue', value: 'next', variant: 'danger' }],
     });

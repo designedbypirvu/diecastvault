@@ -60,6 +60,22 @@ DV.store = (() => {
     return item;
   }
 
+  /**
+   * Dates every model this local change adds or alters as edited now, so it wins over older
+   * copies on other devices. Without this, re-importing a backup or undoing a delete would lose
+   * to the (newer) deletion already synced, and the models would vanish again.
+   */
+  function stamp(prev, next) {
+    const before = new Map(prev.map((it) => [it.id, it]));
+    const now = Date.now();
+    return next.map((it) => {
+      const old = before.get(it.id);
+      if (old === it) return it;
+      if (old ? it.updatedAt > old.updatedAt : it.updatedAt >= now) return it; // already dated by the edit
+      return { ...it, updatedAt: now };
+    });
+  }
+
   /* Items live in IndexedDB (hundreds of MB available) — localStorage caps out around 5 MB,
      which only fits a dozen or so photos. localStorage is kept as a fallback and migrated from. */
   const DB_NAME = 'diecastvault';
@@ -239,5 +255,5 @@ DV.store = (() => {
     }
   }
 
-  return { uid, normalize, isSafeImage, load, save, onExternalChange, onLocalWrite, loadPrefs, savePrefs };
+  return { uid, normalize, stamp, isSafeImage, load, save, onExternalChange, onLocalWrite, loadPrefs, savePrefs };
 })();
