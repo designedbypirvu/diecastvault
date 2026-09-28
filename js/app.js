@@ -199,6 +199,10 @@
         sub: total ? `${uniq('carBrand')} car brands · ${uniq('scale')} scale${uniq('scale') === 1 ? '' : 's'}` : 'Start your collection',
       },
       {
+        label: 'Wishlist', icon: 'heart', value: wishes.length, numeric: true, goto: 'wishlist',
+        sub: latestWish ? `Latest: ${latestWish.carBrand} ${latestWish.model}` : 'Nothing on your wishlist yet',
+      },
+      {
         label: 'Top diecast brand', icon: 'factory', value: topDiecast?.[0] ?? '—',
         sub: topDiecast ? `${topDiecast[1]} model${topDiecast[1] === 1 ? '' : 's'} · ${pct(topDiecast[1])}%` : 'No models yet',
         meter: topDiecast ? pct(topDiecast[1]) : 0,
@@ -207,10 +211,6 @@
         label: 'Top car brand', icon: 'car-front', value: topCar?.[0] ?? '—',
         sub: topCar ? `${topCar[1]} model${topCar[1] === 1 ? '' : 's'} · ${pct(topCar[1])}%` : 'No models yet',
         meter: topCar ? pct(topCar[1]) : 0,
-      },
-      {
-        label: 'Wishlist', icon: 'heart', value: wishes.length, numeric: true, goto: 'wishlist',
-        sub: latestWish ? `Latest: ${latestWish.carBrand} ${latestWish.model}` : 'Nothing on your wishlist yet',
       },
     ];
 
