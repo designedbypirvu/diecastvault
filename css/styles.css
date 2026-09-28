@@ -300,7 +300,7 @@ kbd {
 .brand__name { font: 500 18px/1 var(--font-display); letter-spacing: -0.02em; }
 .brand__name b { font-weight: 700; color: var(--accent); margin-left: 1px; }
 
-/* Export menu */
+/* Dropdown menus */
 .menu { position: relative; }
 .menu__chev { width: 15px !important; height: 15px !important; margin-left: -2px; transition: transform 0.25s var(--ease); }
 .menu.is-open .menu__chev { transform: rotate(180deg); }
@@ -364,7 +364,7 @@ kbd {
 }
 .account__avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 .account__avatar .icon { width: 18px; height: 18px; }
-.account[data-sync='signed-out'] .account__avatar { width: 18px; background: none; }
+.account:is([data-sync='signed-out'], [data-sync='disabled']) .account__avatar { width: 18px; background: none; }
 .account__avatar::after {
   content: '';
   position: absolute;
@@ -383,9 +383,14 @@ kbd {
 .account[data-sync='offline'] .account__avatar::after { opacity: 1; background: var(--gold); }
 .account[data-sync='error'] .account__avatar::after { opacity: 1; background: var(--crimson); }
 @keyframes account-pulse { 50% { opacity: 0.35; } }
-.account__head { padding: 10px 10px 4px; }
+.account__panel { width: 290px; }
+.account__head { margin-bottom: 6px; padding: 10px 10px 12px; border-bottom: 1px solid var(--border); }
 .account__head strong, .account__head small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.account__status { margin: 0 10px 8px; padding-bottom: 10px; border-bottom: 1px solid var(--border); color: var(--text-2); font-size: 12.5px; }
+.account__status { margin-top: 8px; color: var(--text-2); font-size: 12.5px; }
+.menu__section { margin: 0; padding: 10px 10px 4px; color: var(--faint); font: 600 10.5px/1 var(--font-display); letter-spacing: 0.14em; text-transform: uppercase; }
+.menu__panel > .menu__section:first-child { padding-top: 6px; }
+.menu__divider { height: 1px; margin: 6px 4px; background: var(--border); }
+.menu__item--quiet .menu__icon { background: rgba(255, 255, 255, 0.05); color: var(--text-2); }
 .account[data-sync='error'] .account__status { color: #FF6B61; }
 .account[data-sync='offline'] .account__status { color: var(--gold); }
 

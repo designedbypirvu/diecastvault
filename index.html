@@ -34,45 +34,46 @@
       </a>
 
       <nav class="topbar__actions" aria-label="Collection actions">
-        <button class="btn btn--ghost" id="importBtn" type="button" title="Import a JSON backup">
-          <i data-lucide="upload"></i><span class="btn__label">Import</span>
-        </button>
-
-        <div class="menu" id="exportMenu">
-          <button class="btn btn--ghost" id="exportBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="exportPanel">
-            <i data-lucide="download"></i><span class="btn__label">Export</span><i data-lucide="chevron-down" class="menu__chev"></i>
-          </button>
-          <div class="menu__panel" id="exportPanel" role="menu">
-            <button type="button" role="menuitem" data-export="json">
-              <span class="menu__icon"><i data-lucide="file-json"></i></span>
-              <span><strong>Export as JSON</strong><small>Full backup incl. photos</small></span>
-            </button>
-            <button type="button" role="menuitem" data-export="csv">
-              <span class="menu__icon"><i data-lucide="sheet"></i></span>
-              <span><strong>Export as CSV</strong><small>For Excel &amp; Google Sheets</small></span>
-            </button>
-          </div>
-        </div>
-
         <button class="btn btn--primary" id="addBtn" type="button">
           <i data-lucide="plus"></i><span class="btn__label">Add model</span>
         </button>
 
-        <div class="menu account" id="accountMenu" hidden>
+        <!-- Account, sync and backup: one menu. data-when shows an item only when signed "in" or "out". -->
+        <div class="menu account" id="accountMenu">
           <button class="btn btn--ghost account__btn" id="accountBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="accountPanel">
-            <span class="account__avatar" id="accountAvatar"></span><span class="btn__label" id="accountLabel">Sign in</span>
+            <span class="account__avatar" id="accountAvatar"></span><span class="btn__label" id="accountLabel">Menu</span><i data-lucide="chevron-down" class="menu__chev"></i>
           </button>
           <div class="menu__panel account__panel" id="accountPanel" role="menu">
-            <div class="account__head">
+            <div class="account__head" data-when="in">
               <strong id="accountName"></strong>
               <small id="accountEmail"></small>
+              <p class="account__status" id="accountStatus" aria-live="polite"></p>
             </div>
-            <p class="account__status" id="accountStatus" aria-live="polite"></p>
-            <button type="button" role="menuitem" data-account="sync">
+            <button type="button" role="menuitem" data-account="signin" data-when="out">
+              <span class="menu__icon"><i data-lucide="log-in"></i></span>
+              <span><strong>Sign in with Google</strong><small>Sync your collection across devices</small></span>
+            </button>
+            <button type="button" role="menuitem" data-account="sync" data-when="in">
               <span class="menu__icon"><i data-lucide="refresh-cw"></i></span>
               <span><strong>Sync now</strong><small>Fetch changes from your other devices</small></span>
             </button>
-            <button type="button" role="menuitem" data-account="signout">
+
+            <p class="menu__section">Backup</p>
+            <button type="button" role="menuitem" data-account="import">
+              <span class="menu__icon"><i data-lucide="upload"></i></span>
+              <span><strong>Import backup</strong><small>Restore from a JSON file</small></span>
+            </button>
+            <button type="button" role="menuitem" data-account="export-json">
+              <span class="menu__icon"><i data-lucide="file-json"></i></span>
+              <span><strong>Export as JSON</strong><small>Full backup incl. photos</small></span>
+            </button>
+            <button type="button" role="menuitem" data-account="export-csv">
+              <span class="menu__icon"><i data-lucide="sheet"></i></span>
+              <span><strong>Export as CSV</strong><small>For Excel &amp; Google Sheets</small></span>
+            </button>
+
+            <div class="menu__divider" data-when="in"></div>
+            <button type="button" role="menuitem" class="menu__item--quiet" data-account="signout" data-when="in">
               <span class="menu__icon"><i data-lucide="log-out"></i></span>
               <span><strong>Sign out</strong><small>This device keeps its copy</small></span>
             </button>

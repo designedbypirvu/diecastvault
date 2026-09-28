@@ -76,8 +76,6 @@
     empty: $('#emptyState'),
     toasts: $('#toasts'),
     importInput: $('#importInput'),
-    exportMenu: $('#exportMenu'),
-    exportBtn: $('#exportBtn'),
     formModal: $('#formModal'),
     form: $('#carForm'),
     detailModal: $('#detailModal'),
@@ -1023,7 +1021,7 @@
   function setAccountMenu(open) {
     els.accountMenu.classList.toggle('is-open', open);
     els.accountBtn.setAttribute('aria-expanded', String(open));
-    if (open) $('[role="menuitem"]', els.accountMenu).focus();
+    if (open) $('[role="menuitem"]:not([hidden])', els.accountMenu).focus();
   }
 
   const ago = (t) => {
@@ -1044,24 +1042,24 @@
 
   let accountKey = null; // which account the avatar was last drawn for
   function renderAccount(s) {
-    els.accountMenu.hidden = s.state === 'disabled';
-    if (s.state === 'disabled') return;
     const signedIn = Boolean(s.user);
     const avatar = $('#accountAvatar');
     els.accountMenu.dataset.sync = s.state;
-    els.accountBtn.setAttribute('aria-haspopup', signedIn ? 'menu' : 'false');
-    els.accountBtn.title = signedIn ? syncStatusText(s) : 'Sign in with Google to sync your devices';
+    $$('[data-when]', els.accountMenu).forEach((el) => {
+      // Without sync configured there is nothing to sign in to: the menu is just backups.
+      el.hidden = s.state === 'disabled' || el.dataset.when !== (signedIn ? 'in' : 'out');
+    });
+    els.accountBtn.title = signedIn ? syncStatusText(s) : 'Sign in, import & export';
     $('#accountStatus').textContent = syncStatusText(s);
-    if (!signedIn) setAccountMenu(false);
 
     if ((s.user?.id ?? '') === accountKey) return; // only rebuild the avatar when the account changes
     accountKey = s.user?.id ?? '';
     const meta = s.user?.user_metadata || {};
     const name = meta.full_name || meta.name || s.user?.email || '';
-    $('#accountLabel').textContent = signedIn ? (name.split(' ')[0] || 'Account') : 'Sign in';
+    $('#accountLabel').textContent = signedIn ? (name.split(' ')[0] || 'Account') : 'Menu';
     $('#accountName').textContent = name;
     $('#accountEmail').textContent = s.user?.email || '';
-    avatar.innerHTML = !signedIn ? '<i data-lucide="log-in"></i>'
+    avatar.innerHTML = !signedIn ? '<i data-lucide="menu"></i>'
       : meta.avatar_url ? `<img src="${esc(meta.avatar_url)}" alt="" referrerpolicy="no-referrer">`
       : `<span>${esc(initials(name) || '?')}</span>`;
     hydrateIcons(avatar);
@@ -1080,11 +1078,6 @@
     $('#heroTitle').classList.toggle('has-name', Boolean(first));
   }
 
-  function setExportMenu(open) {
-    els.exportMenu.classList.toggle('is-open', open);
-    els.exportBtn.setAttribute('aria-expanded', String(open));
-    if (open) $('[role="menuitem"]', els.exportMenu).focus();
-  }
 
   /* ─── Filter setters ───────────────────────────────────────── */
   function setFilter(patch) {
@@ -1122,28 +1115,22 @@
   function bindEvents() {
     // Header
     $('#addBtn').addEventListener('click', () => openForm());
-    $('#importBtn').addEventListener('click', () => els.importInput.click());
     els.importInput.addEventListener('change', () => { importFile(els.importInput.files[0]); els.importInput.value = ''; });
-
-    els.exportBtn.addEventListener('click', (e) => { e.stopPropagation(); setExportMenu(!els.exportMenu.classList.contains('is-open')); });
-    els.exportMenu.addEventListener('click', (e) => {
-      const item = e.target.closest('[data-export]');
-      if (!item) return;
-      setExportMenu(false);
-      exportAs(item.dataset.export);
-    });
-    document.addEventListener('click', (e) => { if (!els.exportMenu.contains(e.target)) setExportMenu(false); });
 
     els.accountBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (!DV.sync.status().user) DV.sync.signIn();
-      else setAccountMenu(!els.accountMenu.classList.contains('is-open'));
+      setAccountMenu(!els.accountMenu.classList.contains('is-open'));
     });
     els.accountMenu.addEventListener('click', (e) => {
       const item = e.target.closest('[data-account]');
       if (!item) return;
       setAccountMenu(false);
-      if (item.dataset.account === 'sync') DV.sync.syncNow();
+      const action = item.dataset.account;
+      if (action === 'signin') DV.sync.signIn();
+      else if (action === 'sync') DV.sync.syncNow();
+      else if (action === 'import') els.importInput.click();
+      else if (action === 'export-json') exportAs('json');
+      else if (action === 'export-csv') exportAs('csv');
       else DV.sync.signOut().then(() => toast('Signed out. This device keeps its copy of your collection.', { type: 'info' }));
     });
     document.addEventListener('click', (e) => { if (!els.accountMenu.contains(e.target)) setAccountMenu(false); });
@@ -1283,7 +1270,6 @@
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && els.exportMenu.classList.contains('is-open')) { setExportMenu(false); els.exportBtn.focus(); return; }
       if (e.key === 'Escape' && els.accountMenu.classList.contains('is-open')) { setAccountMenu(false); els.accountBtn.focus(); return; }
       const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
       if (typing || $('dialog[open]') || e.metaKey || e.ctrlKey || e.altKey) return;
