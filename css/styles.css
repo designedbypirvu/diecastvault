@@ -484,6 +484,13 @@ kbd {
   background-clip: text;
   color: transparent;
 }
+/* Signed in: "Welcome to / your garage, Cristian." — smaller so the name fits beside "garage" on wide screens
+   and drops to its own line on narrow ones (the comma stays with "garage") */
+.hero__title.has-name { font-size: clamp(40px, 7.2vw, 96px); line-height: 0.96; }
+.hero__line { white-space: nowrap; }
+.hero__name[hidden] { display: none; }
+.hero__name { display: inline-block; max-width: 100%; overflow-wrap: anywhere; animation: hero-name-in 0.7s var(--ease) both; }
+@keyframes hero-name-in { from { opacity: 0; transform: translateY(0.12em); } }
 .hero__lede {
   max-width: 540px;
   margin-top: 24px;

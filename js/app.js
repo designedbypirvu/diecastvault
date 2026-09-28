@@ -1065,7 +1065,19 @@
       : meta.avatar_url ? `<img src="${esc(meta.avatar_url)}" alt="" referrerpolicy="no-referrer">`
       : `<span>${esc(initials(name) || '?')}</span>`;
     hydrateIcons(avatar);
+    renderGreeting(signedIn ? name : '');
     if (s.welcome) toast(`Signed in as ${name} — syncing your collection.`, { type: 'info' });
+  }
+
+  /** Hero headline: "Welcome to your garage, Cristian." once signed in. */
+  function renderGreeting(fullName) {
+    let first = fullName.includes('@') ? '' : fullName.trim().split(/\s+/)[0];
+    if (first.length > 14) first = `${first.slice(0, 13)}…`; // keep the headline to three lines at most
+    const heroName = $('#heroName');
+    heroName.textContent = !first ? '' : first.endsWith('…') ? first : `${first}.`;
+    heroName.hidden = !first;
+    $('.hero__greet').hidden = !first;
+    $('#heroTitle').classList.toggle('has-name', Boolean(first));
   }
 
   function setExportMenu(open) {
