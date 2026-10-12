@@ -164,15 +164,54 @@ DV.io = (() => {
     }
   }
 
-  /** Compresses an uploaded image file into a compact data URL. */
-  async function imageToDataURL(file) {
-    if (!file || !file.type.startsWith('image/')) throw new Error('Please choose an image file.');
-    const url = URL.createObjectURL(file);
+  /* ─── HEIC (iPhone photos) ──────────────────────────────── */
+  // Safari decodes HEIC itself; Chrome and Firefox can't, so a ~3 MB decoder is fetched the first time one shows up.
+  const HEIC_LIB = {
+    src: 'https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/iife/heic-to.js',
+    integrity: 'sha384-cVm8gaWQ5+URpoh6ACKXpm8TuyoHkfIDDBkxvDoUdIZ18w8nV5en0lVQvWMwO/6S',
+  };
+  const isHeicFile = (file) => /^image\/hei[cf]/i.test(file.type) || /\.(heic|heif)$/i.test(file.name || '');
+
+  let heicLib = null;
+  function loadHeicDecoder() {
+    heicLib ||= new Promise((resolve, reject) => {
+      const script = Object.assign(document.createElement('script'), { ...HEIC_LIB, crossOrigin: 'anonymous', async: true });
+      script.onload = () => (window.HeicTo ? resolve(window.HeicTo) : reject());
+      script.onerror = () => { script.remove(); reject(); };
+      document.head.appendChild(script);
+    }).catch(() => {
+      heicLib = null; // let the next photo try again
+      throw new Error('Couldn’t load the HEIC converter. Check your connection, or save the photo as JPEG.');
+    });
+    return heicLib;
+  }
+
+  async function compressBlob(blob) {
+    const url = URL.createObjectURL(blob);
     try {
       return await compressImage(url);
     } finally {
       URL.revokeObjectURL(url);
     }
+  }
+
+  /** Compresses an uploaded image file into a compact data URL. */
+  async function imageToDataURL(file) {
+    const heic = Boolean(file) && isHeicFile(file);
+    if (!file || !(heic || file.type.startsWith('image/'))) throw new Error('Please choose an image file.');
+    try {
+      return await compressBlob(file);
+    } catch (err) {
+      if (!heic) throw err;
+    }
+    const heicTo = await loadHeicDecoder();
+    let jpeg;
+    try {
+      jpeg = await heicTo({ blob: file, type: 'image/jpeg', quality: 0.92 });
+    } catch {
+      throw new Error('That HEIC photo couldn’t be converted. Try exporting it as JPEG.');
+    }
+    return compressBlob(jpeg);
   }
 
   /** Recompresses an already-stored data URL if it's over budget; returns the smaller of old and new. */
