@@ -45,6 +45,7 @@ DV.store = (() => {
       year: normalizeYear(raw.year),
       scale: str(raw.scale) || '1:64',
       series: str(raw.series),
+      category: str(raw.category),
       condition: normalizeCondition(raw.condition),
       shelved: !wishlist && (raw.shelved === true || /^(true|yes|1)$/i.test(str(raw.shelved))),
       wishlist,               // true = wanted, not owned yet

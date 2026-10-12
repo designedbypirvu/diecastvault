@@ -779,6 +779,9 @@ select option, select optgroup { background: var(--surface); color: var(--text);
 .chip--shelf .icon { color: var(--gold); }
 .chip--chase .icon { color: var(--rose); }
 .chip--dupes .icon { color: var(--text-2); }
+.chip--category .icon { color: var(--accent); }
+.chip--category.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.chip--category.is-active .chip__count { background: var(--accent); color: var(--bg); }
 .chip--dupes.is-active { border-color: var(--text-2); background: rgba(255, 255, 255, 0.08); color: var(--text); }
 .chip--dupes.is-active .chip__count { background: var(--text-2); color: var(--bg); }
 .chip--chase.is-active { border-color: var(--rose); background: var(--rose-soft); color: var(--rose); }
@@ -1423,8 +1426,7 @@ dialog.modal.is-closing::backdrop { animation: fadeOut 0.2s var(--ease) both; }
   .tabs button { flex: 1; justify-content: center; padding: 0 10px; }
 
   .controls__row { display: grid; grid-template-columns: 1fr 1fr; }
-  .controls__row .select:nth-child(3) { grid-column: 1; }
-  .view-toggle { justify-self: stretch; }
+  .view-toggle { grid-column: 1 / -1; justify-self: stretch; }
   .view-toggle button { flex: 1; }
   .select__label { display: none; }
   .select { padding-left: 12px; }

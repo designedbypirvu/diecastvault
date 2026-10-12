@@ -32,6 +32,8 @@ DV.config = Object.freeze({
 
   SERIES: ['Mainline', 'Silver Series', 'Premium', 'Limited Edition', 'RLC'],
 
+  CATEGORIES: ['JDM', 'Racers/Supercars/Rally', 'Old/New Classics'],
+
   CONDITIONS: [
     { value: 'Mint in Box / Carded', short: 'Carded', tone: 'mint', icon: 'package-check' },
     { value: 'Loose', short: 'Loose', tone: 'loose', icon: 'package-open' },
@@ -42,6 +44,7 @@ DV.config = Object.freeze({
     { value: 'newest', label: 'Newest added' },
     { value: 'oldest', label: 'Oldest added' },
     { value: 'car', label: 'Car brand A–Z' },
+    { value: 'category', label: 'Category' },
     { value: 'model', label: 'Model name A–Z' },
     { value: 'year', label: 'Model year' },
   ],

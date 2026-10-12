@@ -46,6 +46,7 @@
     search: '',
     diecast: '',
     car: '',
+    category: '',
     shelf: '',               // '' | 'on' | 'off'
     chase: false,            // only TH / Chase models
     dupes: false,            // only models marked as duplicates
@@ -68,6 +69,7 @@
     search: $('#search'),
     filterDiecast: $('#filterDiecast'),
     filterCar: $('#filterCar'),
+    filterCategory: $('#filterCategory'),
     sort: $('#sort'),
     chips: $('#chips'),
     resultCount: $('#resultCount'),
@@ -162,11 +164,12 @@
     const list = sectionItems().filter((it) => {
       if (state.diecast && it.diecastBrand !== state.diecast) return false;
       if (state.car && it.carBrand !== state.car) return false;
+      if (state.category && it.category !== state.category) return false;
       if (state.shelf && it.shelved !== (state.shelf === 'on')) return false;
       if (state.chase && !it.chase) return false;
       if (state.dupes && !it.duplicate) return false;
       if (!terms.length) return true;
-      const hay = fold(`${it.diecastBrand} ${it.carBrand} ${it.model} ${it.year} ${it.series}`);
+      const hay = fold(`${it.diecastBrand} ${it.carBrand} ${it.model} ${it.year} ${it.series} ${it.category}`);
       return terms.every((t) => hay.includes(t));
     });
     const sorters = {
@@ -174,13 +177,15 @@
       oldest: (a, b) => a.createdAt - b.createdAt,
       car: (a, b) => byText(a.carBrand, b.carBrand) || byText(a.model, b.model),
       model: (a, b) => byText(a.model, b.model) || byText(a.carBrand, b.carBrand),
+      // grouped by category A–Z; uncategorised cars go last
+      category: (a, b) => (!a.category - !b.category) || byText(a.category, b.category) || byText(a.carBrand, b.carBrand) || byText(a.model, b.model),
       // oldest model year first; cars without a year go last
       year: (a, b) => (a.year || '9999').localeCompare(b.year || '9999') || byText(a.carBrand, b.carBrand) || byText(a.model, b.model),
     };
     return list.sort(sorters[state.sort]);
   }
 
-  const hasFilters = () => Boolean(state.search.trim() || state.diecast || state.car || state.shelf || state.chase || state.dupes);
+  const hasFilters = () => Boolean(state.search.trim() || state.diecast || state.car || state.category || state.shelf || state.chase || state.dupes);
 
   /* ─── Rendering: stats ─────────────────────────────────────── */
   function renderStats() {
@@ -257,10 +262,13 @@
     const items = sectionItems();
     const diecast = countBy(items, 'diecastBrand');
     const car = countBy(items, 'carBrand');
+    const category = countBy(items.filter((i) => i.category), 'category');
     if (state.diecast && !diecast.some(([v]) => v === state.diecast)) state.diecast = '';
     if (state.car && !car.some(([v]) => v === state.car)) state.car = '';
+    if (state.category && !category.some(([v]) => v === state.category)) state.category = '';
     fillFilterSelect(els.filterDiecast, diecast, 'All manufacturers', state.diecast);
     fillFilterSelect(els.filterCar, car, 'All car brands', state.car);
+    fillFilterSelect(els.filterCategory, category, 'All categories', state.category);
   }
 
   function renderChips() {
@@ -273,13 +281,14 @@
       ]),
       ...(items.some((i) => i.chase) ? [{ type: 'chase', value: 'on', label: 'TH / Chase', count: items.filter((i) => i.chase).length }] : []),
       ...(items.some((i) => i.duplicate) ? [{ type: 'dupes', value: 'on', label: 'Duplicates', count: items.filter((i) => i.duplicate).length }] : []),
+      ...countBy(items.filter((i) => i.category), 'category').map(([v, n]) => ({ type: 'category', value: v, label: v, count: n })),
       ...countBy(items, 'diecastBrand').slice(0, 2).map(([v, n]) => ({ type: 'diecast', value: v, label: v, count: n })),
       ...countBy(items, 'carBrand').slice(0, 5).map(([v, n]) => ({ type: 'car', value: v, label: v, count: n })),
     ];
     els.chips.hidden = items.length === 0;
     els.chips.innerHTML = chips.map((c) => `
       <button type="button" class="chip chip--${c.type}" data-chip-type="${c.type}" data-chip-value="${esc(c.value ?? '')}" aria-pressed="false">
-        ${c.type === 'diecast' ? '<i data-lucide="factory"></i>' : c.type === 'chase' ? '<i data-lucide="flame"></i>' : c.type === 'dupes' ? '<i data-lucide="copy"></i>' : c.value === 'on' ? '<i data-lucide="library"></i>' : ''}${esc(c.label)}<span class="chip__count">${c.count}</span>
+        ${c.type === 'diecast' ? '<i data-lucide="factory"></i>' : c.type === 'chase' ? '<i data-lucide="flame"></i>' : c.type === 'dupes' ? '<i data-lucide="copy"></i>' : c.type === 'category' ? '<i data-lucide="shapes"></i>' : c.value === 'on' ? '<i data-lucide="library"></i>' : ''}${esc(c.label)}<span class="chip__count">${c.count}</span>
       </button>`).join('');
     hydrateIcons(els.chips);
     syncChipState();
@@ -288,11 +297,12 @@
   function syncChipState() {
     $$('.chip', els.chips).forEach((chip) => {
       const { chipType: type, chipValue: value } = chip.dataset;
-      const active = type === 'all' ? !state.diecast && !state.car && !state.shelf && !state.chase && !state.dupes
+      const active = type === 'all' ? !state.diecast && !state.car && !state.category && !state.shelf && !state.chase && !state.dupes
         : type === 'shelf' ? state.shelf === value
         : type === 'chase' ? state.chase
         : type === 'dupes' ? state.dupes
         : type === 'diecast' ? state.diecast === value
+        : type === 'category' ? state.category === value
         : state.car === value;
       chip.classList.toggle('is-active', active);
       chip.setAttribute('aria-pressed', String(active));
@@ -595,6 +605,8 @@
     scaleCustom: $('#fScaleCustom'),
     series: $('#fSeries'),
     seriesCustom: $('#fSeriesCustom'),
+    category: $('#fCategory'),
+    categoryCustom: $('#fCategoryCustom'),
     conditions: $('#fCondition'),
     preview: $('#photoPreview'),
     file: $('#fFile'),
@@ -666,6 +678,10 @@
       ${C.SERIES.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}
       ${seriesUsed.length ? `<optgroup label="From your collection">${seriesUsed.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}</optgroup>` : ''}
       <option value="${C.CUSTOM}">Custom…</option>`;
+    const categoriesUsed = [...new Set(state.items.map((i) => i.category))].filter((c) => c && !C.CATEGORIES.includes(c)).sort(byText);
+    form.category.innerHTML = `<option value="">None</option>
+      ${[...C.CATEGORIES, ...categoriesUsed].map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}
+      <option value="${C.CUSTOM}">New category…</option>`;
     form.conditions.innerHTML = C.CONDITIONS.map((c) => `
       <label class="pill-option pill-option--${c.tone}">
         <input type="radio" name="condition" value="${esc(c.value)}" ${c.value === 'Loose' ? 'checked' : ''}>
@@ -678,6 +694,7 @@
     form.model.value = item?.model ?? '';
     form.year.value = item?.year ?? '';
     setChoice(form.series, form.seriesCustom, item?.series ?? '');
+    setChoice(form.category, form.categoryCustom, item?.category ?? '');
     if (item) {
       const radio = $$('input[name="condition"]', form.conditions).find((r) => r.value === item.condition);
       if (radio) radio.checked = true;
@@ -714,6 +731,7 @@
       year: form.year.value.trim(),
       scale: readChoice(form.scale, form.scaleCustom),
       series: readChoice(form.series, form.seriesCustom),
+      category: readChoice(form.category, form.categoryCustom),
       condition: $('input[name="condition"]:checked', form.conditions)?.value ?? 'Loose',
       shelved: !form.wishlist && $('input[name="shelved"]:checked', els.form)?.value === 'yes',
       wishlist: form.wishlist,
@@ -790,6 +808,7 @@
       ['Year', item.year || '—', 'calendar'],
       ['Scale', item.scale, 'ruler'],
       ['Series', item.series || '—', 'layers'],
+      ['Category', item.category || '—', 'shapes'],
       ['Condition', cond.value, cond.icon],
       ...(item.chase || item.duplicate ? [['Special', [item.chase && 'TH / Chase', item.duplicate && 'Duplicate'].filter(Boolean).join(' · '), item.chase ? 'flame' : 'copy']] : []),
       [item.wishlist ? 'Wishlisted' : 'Added', fmtDate(item.createdAt), 'calendar-days'],
@@ -1094,12 +1113,13 @@
     Object.assign(state, patch);
     els.filterDiecast.value = state.diecast;
     els.filterCar.value = state.car;
+    els.filterCategory.value = state.category;
     renderResults();
   }
 
   function clearFilters() {
     els.search.value = '';
-    setFilter({ search: '', diecast: '', car: '', shelf: '', chase: false, dupes: false });
+    setFilter({ search: '', diecast: '', car: '', category: '', shelf: '', chase: false, dupes: false });
   }
 
   /** Switches between the owned collection and the wishlist; filters start fresh on each side. */
@@ -1107,7 +1127,7 @@
     if (section === state.section) return;
     state.section = section;
     els.search.value = '';
-    Object.assign(state, { search: '', diecast: '', car: '', shelf: '', chase: false, dupes: false });
+    Object.assign(state, { search: '', diecast: '', car: '', category: '', shelf: '', chase: false, dupes: false });
     renderTabs();
     renderFilterOptions();
     renderChips();
@@ -1169,6 +1189,7 @@
     els.search.addEventListener('input', () => setFilter({ search: els.search.value }));
     els.filterDiecast.addEventListener('change', () => setFilter({ diecast: els.filterDiecast.value }));
     els.filterCar.addEventListener('change', () => setFilter({ car: els.filterCar.value }));
+    els.filterCategory.addEventListener('change', () => setFilter({ category: els.filterCategory.value }));
     els.sort.addEventListener('change', () => { state.sort = els.sort.value; savePrefs(); renderResults(); });
     $$('[data-view]').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
     els.clearFilters.addEventListener('click', clearFilters);
@@ -1178,11 +1199,12 @@
       const chip = e.target.closest('.chip');
       if (!chip) return;
       const { chipType: type, chipValue: value } = chip.dataset;
-      if (type === 'all') setFilter({ diecast: '', car: '', shelf: '', chase: false, dupes: false });
+      if (type === 'all') setFilter({ diecast: '', car: '', category: '', shelf: '', chase: false, dupes: false });
       else if (type === 'chase') setFilter({ chase: !state.chase });
       else if (type === 'dupes') setFilter({ dupes: !state.dupes });
       else if (type === 'shelf') setFilter({ shelf: state.shelf === value ? '' : value });
       else if (type === 'diecast') setFilter({ diecast: state.diecast === value ? '' : value });
+      else if (type === 'category') setFilter({ category: state.category === value ? '' : value });
       else setFilter({ car: state.car === value ? '' : value });
     });
 
@@ -1242,6 +1264,7 @@
     form.car.addEventListener('change', () => { toggleCustom(form.car, form.carCustom); if (!form.photo) setPhoto(''); });
     form.scale.addEventListener('change', () => toggleCustom(form.scale, form.scaleCustom));
     form.series.addEventListener('change', () => toggleCustom(form.series, form.seriesCustom));
+    form.category.addEventListener('change', () => toggleCustom(form.category, form.categoryCustom));
     els.form.addEventListener('input', (e) => {
       const field = e.target.closest('.field.has-error');
       if (field) { field.classList.remove('has-error'); $('.field__error', field).textContent = ''; }

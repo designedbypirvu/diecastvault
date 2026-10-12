@@ -132,6 +132,10 @@
           <select id="filterCar" aria-label="Filter by car brand"></select>
         </label>
         <label class="select">
+          <span class="select__label">Category</span>
+          <select id="filterCategory" aria-label="Filter by category"></select>
+        </label>
+        <label class="select">
           <span class="select__label">Sort</span>
           <select id="sort" aria-label="Sort collection"></select>
         </label>
@@ -212,6 +216,12 @@
           <label for="fSeries">Series <span class="opt">optional</span></label>
           <select id="fSeries"></select>
           <input id="fSeriesCustom" class="input custom-input" type="text" placeholder="e.g. Car Culture, Treasure Hunt 2023" maxlength="80" autocomplete="off" hidden>
+        </div>
+
+        <div class="field" data-field="category">
+          <label for="fCategory">Category <span class="opt">optional</span></label>
+          <select id="fCategory"></select>
+          <input id="fCategoryCustom" class="input custom-input" type="text" placeholder="New category name" maxlength="40" autocomplete="off" hidden>
         </div>
 
         <fieldset class="field field--full">
